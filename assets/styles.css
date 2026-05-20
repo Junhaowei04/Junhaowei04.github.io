@@ -372,11 +372,6 @@ button {
   margin-top: 4px;
   border-radius: 50%;
   object-fit: cover;
-  transition: rotate 600ms ease;
-}
-
-.author-card:hover .author-avatar {
-  rotate: 360deg;
 }
 
 .author-card h2 {
