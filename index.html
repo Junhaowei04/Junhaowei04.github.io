@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MomenT - Personal Blog</title>
+    <meta name="description" content="MomenT 的个人博客，记录学习、研究与生活。" />
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body>
+    <header class="top-nav" id="top-nav">
+      <a class="site-name" href="#home">MomenT</a>
+      <nav class="nav-menu" aria-label="主导航">
+        <a href="#home">首頁</a>
+        <a href="#archive">歸檔</a>
+        <a href="#tags">標籤</a>
+        <a href="#categories">分類</a>
+        <a href="#links">友鏈</a>
+        <a href="#about">關於</a>
+      </nav>
+    </header>
+
+    <section class="page-header full-page" id="home" aria-label="博客封面">
+      <div class="site-info">
+        <h1>MomenT</h1>
+        <p class="site-subtitle">Learning · Research · Notes</p>
+      </div>
+      <a class="scroll-down" href="#content" aria-label="向下滚动">
+        <span></span>
+      </a>
+    </section>
+
+    <main class="layout" id="content">
+      <section class="recent-posts" aria-label="最新文章">
+        <div class="post-list" id="post-list"></div>
+        <nav class="pagination" id="pagination" aria-label="分页">
+          <span class="is-current">1</span>
+          <a href="#">2</a>
+          <span>…</span>
+          <a href="#">5</a>
+        </nav>
+      </section>
+
+      <aside class="aside-content" aria-label="侧边栏">
+        <section class="aside-card author-card">
+          <img class="author-avatar" src="assets/avatar.svg" alt="avatar" />
+          <h2>MomenT</h2>
+          <div class="author-stats">
+            <a href="#content"><strong id="author-post-count">0</strong><span>文章</span></a>
+            <a href="#tags"><strong id="author-tag-count">0</strong><span>標籤</span></a>
+            <a href="#categories"><strong id="author-category-count">0</strong><span>分類</span></a>
+          </div>
+          <a class="follow-button" href="#">Follow Me</a>
+        </section>
+
+        <section class="aside-card">
+          <h3>公告</h3>
+          <p>欢迎来到 MomenT 的个人空间。这里会逐步整理学习笔记、研究记录和博客文章。</p>
+        </section>
+
+        <section class="aside-card">
+          <h3>最新文章</h3>
+          <ul class="compact-list" id="latest-list"></ul>
+        </section>
+
+        <section class="aside-card" id="categories">
+          <h3>分類</h3>
+          <ul class="category-list" id="category-list"></ul>
+        </section>
+
+        <section class="aside-card" id="tags">
+          <h3>標籤</h3>
+          <div class="tag-cloud" id="tag-cloud"></div>
+        </section>
+
+        <section class="aside-card" id="archive">
+          <h3>歸檔</h3>
+          <ul class="archive-list" id="archive-list"></ul>
+        </section>
+
+        <section class="aside-card site-card">
+          <h3>網站資訊</h3>
+          <p><span>文章數目 :</span><strong id="site-post-count">0</strong></p>
+          <p><span>本站訪客數 :</span><strong>--</strong></p>
+          <p><span>本站總訪問量 :</span><strong>--</strong></p>
+          <p><span>最後更新時間 :</span><strong id="last-updated">--</strong></p>
+        </section>
+      </aside>
+    </main>
+
+    <footer class="footer">
+      <p>©2026 By MomenT</p>
+      <p>Personal Blog</p>
+    </footer>
+
+    <button class="back-top" id="back-top" type="button" aria-label="回到顶部">↑</button>
+
+    <script src="assets/content.js"></script>
+    <script src="assets/app.js"></script>
+  </body>
+</html>

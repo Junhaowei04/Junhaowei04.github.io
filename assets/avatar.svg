@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Author avatar">
+  <rect width="256" height="256" rx="48" fill="#101820"/>
+  <circle cx="182" cy="74" r="42" fill="#d8614b"/>
+  <path d="M44 190c34-74 72-112 114-112 23 0 41 10 54 30-15-7-31-8-48-3-38 11-69 43-94 96H44Z" fill="#4aa39c"/>
+  <path d="M58 66h82v20H58V66Zm0 52h108v20H58v-20Z" fill="#f7f1e3"/>
+  <text x="64" y="218" fill="#f7f1e3" font-family="Arial, sans-serif" font-size="32" font-weight="700">XJTU</text>
+</svg>
