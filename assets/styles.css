@@ -472,20 +472,31 @@ button {
 .tag-cloud {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 10px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px 18px;
+  min-height: 150px;
+  padding: 8px 4px 4px;
 }
 
 .tag-cloud a {
-  color: var(--blue);
-  line-height: 1.4;
+  display: inline-block;
+  color: var(--color, var(--blue));
+  font-size: var(--size, 1rem);
+  font-weight: var(--weight, 650);
+  line-height: 1.1;
+  transform: translateY(var(--shift, 0px));
+  transition:
+    color 160ms ease,
+    transform 160ms ease,
+    text-shadow 160ms ease;
 }
 
-.tag-cloud a:nth-child(3n) {
+.tag-cloud a:hover,
+.tag-cloud a:focus-visible {
   color: var(--pink);
-}
-
-.tag-cloud a:nth-child(4n) {
-  color: #00c4b6;
+  transform: translateY(calc(var(--shift, 0px) - 2px)) scale(1.05);
+  text-shadow: 0 6px 18px rgba(73, 177, 245, 0.22);
 }
 
 .site-card p + p {
