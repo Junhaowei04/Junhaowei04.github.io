@@ -522,6 +522,100 @@ button {
   text-align: center;
 }
 
+.book-figure {
+  margin: 24px 0;
+  padding: 18px;
+  background: rgba(244, 247, 250, 0.62);
+  border: 1px solid var(--line);
+}
+
+.book-figure svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.book-figure figcaption {
+  margin-top: 12px;
+  color: #66727f;
+  font-size: 0.92rem;
+  text-align: center;
+}
+
+.book-figure rect {
+  fill: rgba(232, 239, 245, 0.72);
+  stroke: rgba(72, 83, 97, 0.32);
+  stroke-width: 2;
+}
+
+.book-figure text {
+  fill: #334155;
+  font-size: 18px;
+}
+
+.book-figure line,
+.book-figure path {
+  fill: none;
+  stroke: #2f86bd;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.book-figure marker path {
+  fill: #2f86bd;
+  stroke: none;
+}
+
+.book-figure .axis line {
+  stroke: rgba(72, 83, 97, 0.36);
+  stroke-width: 2;
+}
+
+.book-figure .axis path,
+.generated-figure .real-curve {
+  stroke: #2f86bd;
+  stroke-width: 4;
+}
+
+.generated-figure .gen-curve {
+  stroke: #a75a43;
+  stroke-width: 4;
+  stroke-dasharray: 9 7;
+}
+
+.generated-figure .legend-real {
+  stroke: #2f86bd;
+  stroke-width: 4;
+}
+
+.generated-figure .legend-gen {
+  stroke: #a75a43;
+  stroke-width: 4;
+  stroke-dasharray: 9 7;
+}
+
+.parameter-figure .sample-dots circle {
+  fill: #a75a43;
+  stroke: #ffffff;
+  stroke-width: 2;
+}
+
+.kl-figure rect {
+  fill: rgba(47, 134, 189, 0.38);
+}
+
+.kl-figure .qbar {
+  fill: rgba(167, 90, 67, 0.42);
+}
+
+.kl-figure .qbar.bad {
+  fill: rgba(167, 90, 67, 0.68);
+}
+
+.kl-figure .qbar.good {
+  fill: rgba(47, 134, 189, 0.48);
+}
+
 .chain-figure {
   display: grid;
   grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;

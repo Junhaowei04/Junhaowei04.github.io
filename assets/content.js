@@ -36,6 +36,30 @@ window.siteContent = {
           \]</div>
           <p>这些数字看起来只是一个表格。但从统计建模的视角看，每个数字都不是凭空出现的，而是从某个总体中抽出来的样本。这个总体可以是“某年龄段男性的身高总体”，也可以是“某学校所有学生的身高总体”。</p>
           <p>总体通常很大，甚至我们永远无法完整观察。我们能拿到的只是有限样本。统计学和机器学习常常做的事情，就是用有限样本反推总体的性质。生成模型也是如此：我们看到有限训练数据，希望学到背后的数据生成机制。</p>
+
+          <figure class="book-figure population-figure">
+            <svg viewBox="0 0 860 260" role="img" aria-label="总体、采样、样本和估计关系示意图">
+              <defs>
+                <marker id="pop-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+                  <path d="M0,0 L0,6 L9,3 z"></path>
+                </marker>
+              </defs>
+              <rect x="40" y="54" width="250" height="150"></rect>
+              <text x="165" y="90" text-anchor="middle">总体</text>
+              <text x="165" y="124" text-anchor="middle">真实世界中的全部对象</text>
+              <text x="165" y="154" text-anchor="middle">背后有未知分布 p_data(x)</text>
+              <line x1="300" y1="100" x2="470" y2="100" marker-end="url(#pop-arrow)"></line>
+              <text x="385" y="80" text-anchor="middle">采样</text>
+              <rect x="480" y="54" width="300" height="150"></rect>
+              <text x="630" y="90" text-anchor="middle">样本 / 训练集</text>
+              <text x="630" y="124" text-anchor="middle">我们真正能观察到的数据</text>
+              <text x="630" y="154" text-anchor="middle">x^(1), x^(2), ..., x^(N)</text>
+              <path d="M610 210 C500 248, 330 248, 210 210" marker-end="url(#pop-arrow)"></path>
+              <text x="410" y="242" text-anchor="middle">用有限样本估计总体规律</text>
+            </svg>
+            <figcaption>根据《深度学习入门5：生成模型》图 2-2 的含义重绘：样本不是总体本身，而是我们观察总体的窗口。生成模型要从样本反推总体背后的分布。</figcaption>
+          </figure>
+
           <p>书里用“总体”和“样本”来解释这个关系。这个视角非常重要。训练集不是世界本身，训练集只是世界的一小部分观测。模型不能只是记住训练样本，而应该抓住训练样本背后的规律。只有这样，它才能生成训练集中没有的新样本。</p>
           <p>把这个想法换成机器学习语言，就是：</p>
           <div class="equation">\[
@@ -93,6 +117,43 @@ window.siteContent = {
             <li>选择模型形式：假设身高可以近似看成正态分布。</li>
             <li>估计模型参数：根据样本决定 \(\mu\) 和 \(\sigma\) 应该是多少。</li>
           </ol>
+
+          <figure class="book-figure parameter-figure">
+            <svg viewBox="0 0 900 320" role="img" aria-label="生成模型建模和参数估计示意图">
+              <defs>
+                <marker id="param-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+                  <path d="M0,0 L0,6 L9,3 z"></path>
+                </marker>
+              </defs>
+              <g class="axis">
+                <line x1="60" y1="238" x2="310" y2="238"></line>
+                <line x1="70" y1="246" x2="70" y2="70"></line>
+                <path d="M74 236 C112 232, 132 196, 154 138 C180 72, 220 72, 246 138 C268 196, 286 232, 306 236"></path>
+              </g>
+              <text x="185" y="42" text-anchor="middle">模型形式</text>
+              <text x="185" y="272" text-anchor="middle">假设 p_θ(x) 是正态分布</text>
+              <text x="185" y="296" text-anchor="middle">参数 θ = (μ, σ)</text>
+
+              <g class="sample-dots">
+                <circle cx="612" cy="226" r="5"></circle>
+                <circle cx="642" cy="218" r="5"></circle>
+                <circle cx="672" cy="210" r="5"></circle>
+                <circle cx="704" cy="226" r="5"></circle>
+                <circle cx="735" cy="202" r="5"></circle>
+                <circle cx="765" cy="222" r="5"></circle>
+                <line x1="585" y1="238" x2="800" y2="238"></line>
+              </g>
+              <text x="695" y="42" text-anchor="middle">样本</text>
+              <text x="695" y="272" text-anchor="middle">观测到的一批数据</text>
+              <text x="695" y="296" text-anchor="middle">用来决定 μ 和 σ</text>
+
+              <line x1="365" y1="150" x2="535" y2="150" marker-end="url(#param-arrow)"></line>
+              <text x="450" y="126" text-anchor="middle">参数估计</text>
+              <text x="450" y="176" text-anchor="middle">最大似然</text>
+            </svg>
+            <figcaption>根据书中图 2-5 的含义重绘：创建生成模型不是一句“让模型生成数据”就结束了，而是先选择概率模型形式，再用样本估计参数。</figcaption>
+          </figure>
+
           <p>书中把这个过程放在身高数据上讲。先观察身高直方图，发现它大致像钟形曲线；于是选择正态分布作为模型；再用样本估计均值和标准差。这个例子虽然简单，但它已经包含生成模型的基本骨架。</p>
           <p>更复杂的模型也是同样逻辑。GMM 用多个高斯分布叠加来拟合多峰数据；VAE 用神经网络和潜变量来表达复杂分布；Diffusion 用逐步加噪和反向去噪来学习数据分布。模型形式越来越复杂，但根本问题没变：我们要构造一个 \(p_\theta(x)\)，让它接近 \(p_{\mathrm{data}}(x)\)。</p>
         </section>
@@ -256,6 +317,58 @@ window.siteContent = {
             dx.
           \]</div>
           <p>KL 散度越小，说明模型分布越接近真实分布。当两个分布完全相同时，KL 散度为 0。</p>
+
+          <p>如果随机变量是离散的，KL 散度写成求和形式：</p>
+          <div class="equation">\[
+            D_{\mathrm{KL}}(p\|q)
+            =
+            \sum_x p(x)\log\frac{p(x)}{q(x)}.
+          \]</div>
+          <p>这个式子可以逐项理解。每个 \(x\) 都由 \(p(x)\) 加权，这表示我们主要关心真实分布 \(p\) 经常出现的位置；后面的 \(\log\frac{p(x)}{q(x)}\) 则比较真实概率和模型概率。如果某个位置真实概率很高，但模型概率很低，那么这一项会变大，KL 散度会惩罚模型。</p>
+
+          <figure class="book-figure kl-figure">
+            <svg viewBox="0 0 920 360" role="img" aria-label="KL 散度硬币例子示意图">
+              <text x="460" y="36" text-anchor="middle">真实分布 p：正面 0.7，反面 0.3</text>
+              <g transform="translate(70 72)">
+                <text x="0" y="18">q1：比较接近</text>
+                <rect x="160" y="0" width="140" height="34"></rect>
+                <rect x="160" y="48" width="60" height="34"></rect>
+                <rect class="qbar" x="360" y="0" width="100" height="34"></rect>
+                <rect class="qbar" x="360" y="48" width="100" height="34"></rect>
+                <text x="315" y="24">p</text>
+                <text x="515" y="24">q</text>
+                <text x="160" y="110">KL 小，但不是 0</text>
+              </g>
+              <g transform="translate(70 172)">
+                <text x="0" y="18">q2：方向相反</text>
+                <rect x="160" y="0" width="140" height="34"></rect>
+                <rect x="160" y="48" width="60" height="34"></rect>
+                <rect class="qbar bad" x="360" y="0" width="40" height="34"></rect>
+                <rect class="qbar bad" x="360" y="48" width="160" height="34"></rect>
+                <text x="160" y="110">KL 大，因为 q 把概率放错地方</text>
+              </g>
+              <g transform="translate(70 272)">
+                <text x="0" y="18">q3：完全相同</text>
+                <rect x="160" y="0" width="140" height="34"></rect>
+                <rect x="160" y="48" width="60" height="34"></rect>
+                <rect class="qbar good" x="360" y="0" width="140" height="34"></rect>
+                <rect class="qbar good" x="360" y="48" width="60" height="34"></rect>
+                <text x="160" y="110">KL = 0</text>
+              </g>
+            </svg>
+            <figcaption>根据书中图 5-2 的硬币例子重绘：KL 散度不是抽象符号，它衡量的是一个估计分布 \(q\) 和真实分布 \(p\) 的差距。越不像，KL 越大；完全相同，KL 为 0。</figcaption>
+          </figure>
+
+          <p>这张图的含义可以这样读。真实硬币正面概率是 0.7，反面概率是 0.3。如果模型 \(q_1\) 认为正反面都是 0.5，它没有完全正确，但还算接近，所以 KL 较小。如果模型 \(q_2\) 认为正面只有 0.2、反面有 0.8，它和真实分布方向几乎相反，所以 KL 较大。如果模型 \(q_3\) 完全等于真实分布，那么 KL 为 0。</p>
+          <p>KL 散度有一个容易误解的地方：它不是普通距离。普通距离通常满足对称性，比如从 A 到 B 的距离等于从 B 到 A 的距离；但 KL 散度一般不对称：</p>
+          <div class="equation">\[
+            D_{\mathrm{KL}}(p\|q)
+            \neq
+            D_{\mathrm{KL}}(q\|p).
+          \]</div>
+          <p>为什么会不对称？因为 \(D_{\mathrm{KL}}(p\|q)\) 是用 \(p(x)\) 加权的，它更关心真实分布 \(p\) 常出现的位置。如果在某个真实高概率区域，模型 \(q\) 给了极低概率，惩罚会非常重。反过来，\(D_{\mathrm{KL}}(q\|p)\) 又会用 \(q(x)\) 加权，关注点就变了。</p>
+          <p>一个极端情况最能说明问题：如果某个位置 \(p(x)>0\)，但 \(q(x)=0\)，那么 \(\log\frac{p(x)}{q(x)}\) 会发散，KL 变成无穷大。直觉上，这是因为真实世界明明会出现某类样本，但模型说它绝不可能出现，这个错误非常严重。</p>
+
           <p>我们想让 \(p_\theta(x)\) 接近 \(p_{\mathrm{data}}(x)\)，也就是最小化：</p>
           <div class="equation">\[
             \arg\min_\theta
@@ -301,6 +414,25 @@ window.siteContent = {
             x_{\mathrm{new}}\sim p_\theta(x).
           \]</div>
           <p>身高模型中，采样就是从一个正态分布随机生成新身高。图像模型中，采样就是生成新图片。Diffusion 中，从高斯噪声开始逐步去噪，本质上也是一种采样过程。</p>
+
+          <figure class="book-figure generated-figure">
+            <svg viewBox="0 0 900 300" role="img" aria-label="真实数据分布和生成数据分布重合示意图">
+              <g class="axis">
+                <line x1="80" y1="238" x2="820" y2="238"></line>
+                <line x1="90" y1="246" x2="90" y2="58"></line>
+                <path class="real-curve" d="M96 236 C180 232, 252 198, 320 130 C378 72, 448 70, 510 128 C586 198, 672 232, 812 236"></path>
+                <path class="gen-curve" d="M96 237 C176 234, 260 206, 326 138 C382 78, 444 82, 506 136 C580 204, 672 234, 812 237"></path>
+              </g>
+              <text x="454" y="42" text-anchor="middle">真实数据分布与生成数据分布应该大体重合</text>
+              <line class="legend-real" x1="620" y1="72" x2="680" y2="72"></line>
+              <text x="695" y="78">真实数据</text>
+              <line class="legend-gen" x1="620" y1="102" x2="680" y2="102"></line>
+              <text x="695" y="108">生成数据</text>
+              <text x="450" y="272" text-anchor="middle">如果两条分布形状接近，说明模型采样出的数据具有真实数据的统计特征</text>
+            </svg>
+            <figcaption>根据书中图 2-8 的含义重绘：训练后的生成模型应该能采样出与真实数据分布相似的新数据。图中不是要求每个样本相同，而是要求整体分布相近。</figcaption>
+          </figure>
+
           <p><strong>第二，概率评价。</strong>如果我们能计算 \(p_\theta(x)\) 或相关概率，就能判断某个样本在模型下有多合理。例如，身高 172 厘米在模型下密度较高，身高 230 厘米密度极低。对于图像，理想情况下自然图片应该有高概率，随机噪声应该有低概率。</p>
           <p>不同生成模型对这两种能力的支持程度不同。有些模型很容易采样，但不容易计算精确似然，比如 GAN。有些模型可以计算或近似似然，比如 VAE、Flow、Autoregressive Model。有些模型训练和采样路径比较特殊，比如 Diffusion。</p>
           <p>这也解释了为什么生成模型有很多类别。它们都想学习数据分布，但选择了不同的表达方式、训练目标和采样方法。</p>
@@ -381,10 +513,36 @@ window.siteContent = {
           <p>这些问题就是后续学习 Diffusion 的地基。Diffusion 的前向加噪、反向去噪、score、ELBO、Flow Matching 等概念，本质上都建立在“学习数据分布”这件事上。</p>
         </section>
 
+        <section class="article-section">
+          <h2>13. 初学者视角的几个追问</h2>
+          <p>写到这里，我用一个完全初学者的视角重新读一遍，会自然冒出下面这些问题。如果这些问题回答不清楚，前面的概念就还没有真正落地。</p>
+
+          <h3>问题一：为什么不能直接说“生成模型就是学习训练集”？</h3>
+          <p>因为训练集只是有限样本。一个模型如果只记住训练集，它最多能复读旧样本，不能理解总体规律。生成模型真正想学的是训练集背后的数据分布。对于身高数据，训练集中可能没有 173.9 厘米这个值，但如果总体分布支持这个身高，模型就应该能生成它。对于图片也是一样，模型生成的新图片不应该只是训练图像的复制品，而应该是符合真实图片分布的新样本。</p>
+
+          <h3>问题二：为什么一定要引入概率分布？不能只训练一个函数吗？</h3>
+          <p>如果只训练一个确定性函数，输入相同就输出相同，很难描述“可能性”。生成问题天然带有不确定性：同一句提示词可以对应许多合理图片，同一个类别可以对应许多不同样本。概率分布提供了一种语言，告诉我们哪些样本更可能出现，哪些样本不太可能出现。没有分布，就很难严格讨论“像真实数据”这件事。</p>
+
+          <h3>问题三：似然里的概率密度很小，为什么还要最大化它？</h3>
+          <p>在连续高维空间里，单个样本的密度值可能非常小，这是正常的。最大似然不是关心绝对数值好不好看，而是比较不同参数下训练数据的相对合理性。参数 A 下训练数据密度更高，说明 A 比参数 B 更能解释这些观测。实际计算时我们用对数似然，把很多小数的乘积变成求和，也避免数值下溢。</p>
+
+          <h3>问题四：KL 散度到底在惩罚什么？</h3>
+          <p>对于 \(D_{\mathrm{KL}}(p_{\mathrm{data}}\|p_\theta)\)，它重点惩罚模型在真实数据高概率区域给出低概率。也就是说，真实世界常见的东西，模型不能说它罕见；真实世界会出现的模式，模型不能完全漏掉。这和生成模型的目标一致：模型必须覆盖真实数据的重要区域。</p>
+
+          <h3>问题五：最大似然和 KL 散度是不是两个不同目标？</h3>
+          <p>在这里它们是同一件事的两种看法。最大似然从样本角度出发：让训练数据在模型下尽可能合理。KL 散度从分布角度出发：让模型分布接近真实分布。由于真实分布未知，我们用训练样本近似真实分布下的期望，于是最小化 \(D_{\mathrm{KL}}(p_{\mathrm{data}}\|p_\theta)\) 就变成最大化平均对数似然。</p>
+
+          <h3>问题六：为什么一个简单正态分布也算生成模型？</h3>
+          <p>因为它满足生成模型的定义：它对数据分布进行建模，并且可以从模型分布中采样新数据。不要把“生成模型”只理解成大型神经网络。正态分布模型、高斯混合模型、VAE、Flow、Diffusion 都在同一条线上，只是表达能力和训练方式不同。</p>
+
+          <h3>问题七：这篇文章和下一篇 Diffusion 有什么关系？</h3>
+          <p>Diffusion 也是生成模型，所以它仍然要学习 \(p_{\mathrm{data}}(x)\)。区别在于它不直接写出一个简单的 \(p_\theta(x)\)，而是构造一条从数据到噪声、再从噪声回到数据的路径。理解了本文的分布、似然、KL、采样之后，再看 Diffusion 的前向加噪、反向去噪、ELBO 和 score，就会知道它们不是孤立技巧，而是在服务同一个目标：让模型分布接近真实数据分布。</p>
+        </section>
+
         <section class="article-section references">
           <h2>参考资料</h2>
           <ul>
-            <li>斋藤康毅 著，郑明智 译，《深度学习入门5：生成模型》，人民邮电出版社，2025。本文主要参考步骤 1“正态分布”、步骤 2“最大似然估计”和步骤 5.1“KL 散度”。</li>
+            <li>斋藤康毅 著，郑明智 译，《深度学习入门5：生成模型》，人民邮电出版社，2025。本文主要参考步骤 1“正态分布”、步骤 2“最大似然估计”和步骤 5.1“KL 散度”；文中的总体/样本、参数估计、真实与生成分布、KL 硬币例子均为根据书中相关图意重绘。</li>
           </ul>
         </section>
       `,
