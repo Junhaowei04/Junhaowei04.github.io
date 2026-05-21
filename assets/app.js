@@ -102,14 +102,20 @@ function renderArticle(post) {
       <div class="article-body">${post.body || "<p>文章正在整理中。</p>"}</div>
     </article>
   `;
-  initVisualizations(postList);
   typesetMath(postList);
   postList.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function typesetMath(root) {
-  if (!window.MathJax?.typesetPromise) return;
-  window.MathJax.typesetPromise([root]).catch(() => {});
+function typesetMath(root, attempt = 0) {
+  if (window.MathJax?.typesetPromise) {
+    window.MathJax.typesetClear?.([root]);
+    window.MathJax.typesetPromise([root]).catch(() => {});
+    return;
+  }
+
+  if (attempt < 40) {
+    window.setTimeout(() => typesetMath(root, attempt + 1), 120);
+  }
 }
 
 function renderLatest() {
@@ -217,92 +223,6 @@ function syncScrollState() {
   const active = window.scrollY > 60;
   topNav.classList.toggle("is-scrolled", active);
   backTop.classList.toggle("is-visible", window.scrollY > window.innerHeight * 0.7);
-}
-
-function makeRandom(seed) {
-  let value = seed;
-  return () => {
-    value = (value * 1664525 + 1013904223) % 4294967296;
-    return value / 4294967296;
-  };
-}
-
-function gaussianPair(random) {
-  const u1 = Math.max(random(), 1e-6);
-  const u2 = random();
-  const radius = Math.sqrt(-2 * Math.log(u1));
-  const theta = 2 * Math.PI * u2;
-  return [radius * Math.cos(theta), radius * Math.sin(theta)];
-}
-
-function initNoiseViz(card) {
-  const canvas = card.querySelector("canvas");
-  const slider = card.querySelector("input");
-  const output = card.querySelector("output");
-  const context = canvas.getContext("2d");
-  const random = makeRandom(42);
-  const points = Array.from({ length: 380 }, (_, index) => {
-    const [gx, gy] = gaussianPair(random);
-    const cluster = index % 2 === 0 ? -1 : 1;
-    const baseX = cluster * 1.65 + gx * 0.42;
-    const baseY = Math.sin(baseX * 1.25) * 0.55 + gy * 0.34;
-    const [nx, ny] = gaussianPair(random);
-    return { baseX, baseY, nx, ny, cluster };
-  });
-
-  function draw() {
-    const rect = canvas.getBoundingClientRect();
-    const scale = window.devicePixelRatio || 1;
-    canvas.width = Math.max(1, Math.floor(rect.width * scale));
-    canvas.height = Math.max(1, Math.floor(rect.height * scale));
-    context.setTransform(scale, 0, 0, scale, 0, 0);
-
-    const width = rect.width;
-    const height = rect.height;
-    const t = Number(slider.value) / 100;
-    const alphaBar = Math.cos((t * Math.PI) / 2) ** 2;
-    const signal = Math.sqrt(alphaBar);
-    const noise = Math.sqrt(1 - alphaBar);
-
-    context.clearRect(0, 0, width, height);
-    context.fillStyle = "#f8fbff";
-    context.fillRect(0, 0, width, height);
-    context.strokeStyle = "rgba(75, 92, 111, 0.14)";
-    context.lineWidth = 1;
-    for (let x = 40; x < width; x += 48) {
-      context.beginPath();
-      context.moveTo(x, 24);
-      context.lineTo(x, height - 24);
-      context.stroke();
-    }
-    for (let y = 40; y < height; y += 48) {
-      context.beginPath();
-      context.moveTo(24, y);
-      context.lineTo(width - 24, y);
-      context.stroke();
-    }
-
-    points.forEach((point) => {
-      const x = signal * point.baseX + noise * point.nx;
-      const y = signal * point.baseY + noise * point.ny;
-      const px = width / 2 + x * 72;
-      const py = height / 2 - y * 72;
-      context.beginPath();
-      context.fillStyle = point.cluster < 0 ? "rgba(47, 128, 237, 0.72)" : "rgba(255, 107, 61, 0.72)";
-      context.arc(px, py, 4.2, 0, Math.PI * 2);
-      context.fill();
-    });
-
-    output.textContent = `t = ${slider.value}, 信号系数 ≈ ${signal.toFixed(2)}, 噪声系数 ≈ ${noise.toFixed(2)}`;
-  }
-
-  slider.addEventListener("input", draw);
-  window.addEventListener("resize", draw, { passive: true });
-  draw();
-}
-
-function initVisualizations(root) {
-  root.querySelectorAll('[data-viz="noise"]').forEach(initNoiseViz);
 }
 
 function renderApp() {

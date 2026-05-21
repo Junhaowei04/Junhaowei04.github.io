@@ -453,10 +453,15 @@ button {
 }
 
 .equation {
+  display: block;
   overflow-x: auto;
   margin: 14px 0 18px;
   padding: 2px 0 4px;
   color: #26394f;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   font-family: "Cambria Math", "Times New Roman", serif;
   font-size: 1.06rem;
   line-height: 1.7;
@@ -468,8 +473,10 @@ button {
 }
 
 .source-figure {
-  margin: 24px 0;
+  margin: 22px 0;
   padding: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
 
 .source-figure img {
@@ -477,15 +484,14 @@ button {
   width: 100%;
   max-height: 520px;
   object-fit: contain;
-  background: #f3f6f9;
-  border: 1px solid #e0e8f0;
-  border-radius: 0;
+  background: rgba(244, 247, 250, 0.55);
 }
 
 .source-figure figcaption {
-  margin-top: 10px;
+  padding: 10px 0 12px;
   color: #66727f;
   font-size: 0.9rem;
+  line-height: 1.75;
   text-align: center;
 }
 
@@ -505,269 +511,12 @@ button {
   border-left-color: var(--pink);
 }
 
-.article-figure,
-.viz-card,
 .table-wrap {
   margin: 24px 0;
   padding: 18px;
   background: rgba(244, 247, 250, 0.62);
   border: 1px solid var(--line);
   border-radius: 0;
-}
-
-.article-figure figcaption {
-  margin-top: 14px;
-  color: #66727f;
-  font-size: 0.92rem;
-  text-align: center;
-}
-
-.book-figure {
-  margin: 24px 0;
-  padding: 18px;
-  background: rgba(244, 247, 250, 0.62);
-  border: 1px solid var(--line);
-}
-
-.book-figure svg {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.book-figure figcaption {
-  margin-top: 12px;
-  color: #66727f;
-  font-size: 0.92rem;
-  text-align: center;
-}
-
-.book-figure rect {
-  fill: rgba(232, 239, 245, 0.72);
-  stroke: rgba(72, 83, 97, 0.32);
-  stroke-width: 2;
-}
-
-.book-figure text {
-  fill: #334155;
-  font-size: 18px;
-}
-
-.book-figure line,
-.book-figure path {
-  fill: none;
-  stroke: #2f86bd;
-  stroke-width: 3;
-  stroke-linecap: round;
-}
-
-.book-figure marker path {
-  fill: #2f86bd;
-  stroke: none;
-}
-
-.book-figure .axis line {
-  stroke: rgba(72, 83, 97, 0.36);
-  stroke-width: 2;
-}
-
-.book-figure .axis path,
-.generated-figure .real-curve {
-  stroke: #2f86bd;
-  stroke-width: 4;
-}
-
-.generated-figure .gen-curve {
-  stroke: #a75a43;
-  stroke-width: 4;
-  stroke-dasharray: 9 7;
-}
-
-.generated-figure .legend-real {
-  stroke: #2f86bd;
-  stroke-width: 4;
-}
-
-.generated-figure .legend-gen {
-  stroke: #a75a43;
-  stroke-width: 4;
-  stroke-dasharray: 9 7;
-}
-
-.parameter-figure .sample-dots circle {
-  fill: #a75a43;
-  stroke: #ffffff;
-  stroke-width: 2;
-}
-
-.kl-figure rect {
-  fill: rgba(47, 134, 189, 0.38);
-}
-
-.kl-figure .qbar {
-  fill: rgba(167, 90, 67, 0.42);
-}
-
-.kl-figure .qbar.bad {
-  fill: rgba(167, 90, 67, 0.68);
-}
-
-.kl-figure .qbar.good {
-  fill: rgba(47, 134, 189, 0.48);
-}
-
-.chain-figure {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
-  gap: 10px;
-  align-items: center;
-}
-
-.chain-figure figcaption,
-.training-figure figcaption {
-  grid-column: 1 / -1;
-}
-
-.chain-node,
-.train-box {
-  display: grid;
-  min-height: 86px;
-  place-items: center;
-  padding: 12px;
-  color: #345;
-  background: #edf7ff;
-  border: 1px solid #cce9ff;
-  border-radius: 0;
-  font-size: 1.25rem;
-  font-weight: 800;
-  text-align: center;
-}
-
-.chain-node span,
-.train-box span {
-  display: block;
-  color: #6b7887;
-  font-size: 0.78rem;
-  font-weight: 650;
-}
-
-.chain-node.clean {
-  background: #effaf3;
-  border-color: #ccebd7;
-}
-
-.chain-node.noise {
-  background: #fff3ed;
-  border-color: #ffd6c6;
-}
-
-.chain-arrow,
-.train-arrow,
-.train-plus {
-  color: #8a96a3;
-  font-size: 1.25rem;
-  font-weight: 800;
-  text-align: center;
-}
-
-.viz-card canvas {
-  width: 100%;
-  height: 420px;
-  display: block;
-  border-radius: 0;
-}
-
-.viz-controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 18px;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 12px;
-  color: #536170;
-  font-size: 0.92rem;
-}
-
-.viz-controls label {
-  display: flex;
-  min-width: min(360px, 100%);
-  flex: 1;
-  gap: 12px;
-  align-items: center;
-}
-
-.viz-controls input {
-  width: 100%;
-  accent-color: var(--blue);
-}
-
-.training-figure {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
-  gap: 10px;
-  align-items: center;
-}
-
-.model-box {
-  background: #f5efff;
-  border-color: #dfcffc;
-}
-
-.score-figure svg,
-.flow-figure svg {
-  width: 100%;
-  height: auto;
-  color: var(--blue);
-}
-
-.score-cluster circle {
-  fill: none;
-  stroke-width: 2;
-}
-
-.score-cluster.left circle {
-  stroke: rgba(47, 128, 237, 0.7);
-}
-
-.score-cluster.right circle {
-  stroke: rgba(255, 107, 61, 0.7);
-}
-
-.score-arrows line {
-  stroke: currentColor;
-  stroke-width: 3;
-  marker-end: url("#score-arrow");
-}
-
-.flow-path {
-  fill: none;
-  stroke: rgba(47, 128, 237, 0.55);
-  stroke-width: 8;
-  stroke-linecap: round;
-}
-
-.flow-dot {
-  stroke: #ffffff;
-  stroke-width: 4;
-}
-
-.noise-dot {
-  fill: #6c5ce7;
-}
-
-.data-dot {
-  fill: #ff6b3d;
-}
-
-.flow-vector {
-  stroke: #16b4a5;
-  stroke-width: 4;
-  marker-end: url("#flow-arrow");
-}
-
-.flow-figure text {
-  fill: #4b5563;
-  font-size: 20px;
 }
 
 .table-wrap {
@@ -1136,21 +885,6 @@ button {
 
   .post-content {
     padding: 22px;
-  }
-
-  .chain-figure,
-  .training-figure {
-    grid-template-columns: 1fr;
-  }
-
-  .chain-arrow,
-  .train-arrow,
-  .train-plus {
-    transform: rotate(90deg);
-  }
-
-  .viz-card canvas {
-    height: 320px;
   }
 
   .back-top {
