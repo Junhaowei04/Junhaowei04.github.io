@@ -103,7 +103,13 @@ function renderArticle(post) {
     </article>
   `;
   initVisualizations(postList);
+  typesetMath(postList);
   postList.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function typesetMath(root) {
+  if (!window.MathJax?.typesetPromise) return;
+  window.MathJax.typesetPromise([root]).catch(() => {});
 }
 
 function renderLatest() {
