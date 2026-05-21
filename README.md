@@ -19,6 +19,7 @@ Current interests:
 
 Current posts:
 
+- 生成模型入门：从概率分布到分布拟合
 - Diffusion Model 基础理论：从生成建模到 DDPM、Score 与 Flow Matching
 
 More notes and research logs will be added gradually.
