@@ -2,6 +2,797 @@ window.siteContent = {
   author: "MomenT",
   posts: [
     {
+      slug: "vae-foundations",
+      title: "VAE 基础理论：从潜变量模型到 ELBO、重参数化与生成",
+      date: "2026-05-23",
+      category: "学习笔记",
+      summary:
+        "一篇面向生成模型初学者的 VAE 长文。我们从普通 autoencoder 与潜变量生成模型讲起，完整推导 ELBO、变分后验、重参数化技巧、高斯 KL 闭式、训练目标、采样过程，并解释 posterior collapse、β-VAE 与 IWAE。",
+      tags: [
+        "VAE",
+        "Generative Model",
+        "Variational Inference",
+        "ELBO",
+        "Latent Variable Model",
+        "KL Divergence",
+        "Machine Learning"
+      ],
+      cover: "cover-e",
+      body: String.raw`
+        <p class="lead">VAE，也就是 Variational Autoencoder，是现代深度生成模型里非常重要的一条路线。它不像 GAN 那样直接训练一个生成器去骗判别器，也不像 Diffusion 那样设计一条逐步加噪再反向去噪的路径。VAE 的核心问题是：如果真实数据背后存在一个看不见的潜变量 \(z\)，我们能不能一边学会从 \(z\) 生成数据 \(x\)，一边从数据 \(x\) 推断它可能来自哪些 \(z\)？这篇文章会从零开始，把潜变量模型、变分推断、ELBO、重参数化技巧和 VAE 的训练目标完整连起来。</p>
+
+        <section class="article-section">
+          <h2>0. 先说清楚：VAE 想解决什么问题？</h2>
+          <p>前两篇文章已经建立了一个基本观点：生成模型的目标是学习数据分布 \(p_{\mathrm{data}}(x)\)，并从学到的模型分布 \(p_\theta(x)\) 中采样。VAE 也不例外。它只是选择了一种很有结构的方式来表达 \(p_\theta(x)\)：引入一个低维潜变量 \(z\)。</p>
+          <div class="insight-box">VAE 的基本想法是：先从一个简单先验 \(p(z)\) 中采样潜变量 \(z\)，再由神经网络参数化的解码器 \(p_\theta(x|z)\) 生成数据 \(x\)。</div>
+          <p>这句话看起来简单，但里面藏着三个关键问题。</p>
+          <ol>
+            <li><strong>生成问题。</strong>给定 \(z\)，怎么生成 \(x\)？这由解码器 \(p_\theta(x|z)\) 完成。</li>
+            <li><strong>推断问题。</strong>给定一个真实样本 \(x\)，它可能来自哪些 \(z\)？这涉及后验 \(p_\theta(z|x)\)。</li>
+            <li><strong>训练问题。</strong>我们想最大化 \(\log p_\theta(x)\)，但 \(p_\theta(x)\) 要对所有可能 \(z\) 积分，通常难以直接计算。</li>
+          </ol>
+          <p>VAE 的名字里有 autoencoder，是因为它有 encoder 和 decoder；名字里有 variational，是因为它用变分推断近似难算的后验；它是 generative model，是因为训练完成后可以从先验 \(p(z)\) 采样并生成新数据。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>1. 普通 Autoencoder 为什么还不算完整生成模型？</h2>
+          <p>普通 autoencoder 的结构非常直观。给一个输入 \(x\)，编码器把它压缩成隐表示 \(h\)，解码器再从 \(h\) 重建 \(x\)：</p>
+          <div class="equation">\[
+            h=f_\phi(x),\qquad \hat{x}=g_\theta(h).
+          \]</div>
+          <p>训练目标通常是让重建误差尽量小：</p>
+          <div class="equation">\[
+            \mathcal{L}_{\mathrm{AE}}
+            =
+            \|x-\hat{x}\|^2.
+          \]</div>
+          <p>它确实能学到压缩表示，但有一个生成模型视角下的大问题：训练后我们不知道该从哪里采样 \(h\)。编码器产生的 \(h\) 可能分布在潜空间中很不规则的区域。你随便从标准高斯里抽一个 \(h\)，解码器不一定知道怎么处理，因为训练时它可能从没见过这个区域。</p>
+          <p>这就是普通 autoencoder 和生成模型之间的差距。生成模型不仅要会重建已有样本，还要规定一个可采样的潜空间分布，让我们能从这个分布出发生成新样本。VAE 的第一步，就是给潜变量 \(z\) 规定一个简单先验：</p>
+          <div class="equation">\[
+            p(z)=\mathcal{N}(0,I).
+          \]</div>
+          <p>这样生成过程就清楚了：先采样 \(z\sim\mathcal{N}(0,I)\)，再通过 decoder 得到 \(x\)。VAE 要做的，是让这个过程生成的数据分布接近真实数据分布。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>2. 潜变量生成模型：从 \(z\) 到 \(x\)</h2>
+          <p>VAE 的生成模型可以写成两步：</p>
+          <div class="equation">\[
+            z\sim p(z),
+            \qquad
+            x\sim p_\theta(x|z).
+          \]</div>
+          <p>其中 \(p(z)\) 通常选标准高斯：</p>
+          <div class="equation">\[
+            p(z)=\mathcal{N}(z;0,I).
+          \]</div>
+          <p>\(p_\theta(x|z)\) 是解码器定义的条件分布。注意它不是简单的确定性函数 \(x=g_\theta(z)\)，而是概率分布。神经网络输出的是这个分布的参数。例如：</p>
+          <ol>
+            <li>如果 \(x\) 是二值图像，可以让 decoder 输出 Bernoulli 分布的概率。</li>
+            <li>如果 \(x\) 是连续像素，可以让 decoder 输出高斯分布的均值，方差可以固定或一起学习。</li>
+          </ol>
+          <p>模型对一个样本 \(x\) 的边缘概率是把所有可能的 \(z\) 都考虑进去：</p>
+          <div class="equation">\[
+            p_\theta(x)
+            =
+            \int p_\theta(x|z)p(z)\,dz.
+          \]</div>
+          <p>这条公式是 VAE 的核心。它说：一个样本 \(x\) 的概率，不是由某一个潜变量决定的，而是所有潜变量路径共同贡献的总概率。每个 \(z\) 先按先验 \(p(z)\) 出现，再按 \(p_\theta(x|z)\) 生成 \(x\)。把这些可能性加起来，就是 \(p_\theta(x)\)。</p>
+
+          <figure class="source-figure">
+            <img src="https://lilianweng.github.io/posts/2018-08-12-vae/vae-graphical-model.png" alt="VAE 概率图模型" loading="lazy" />
+            <figcaption>参考图：VAE 的概率图模型。实线部分表示生成模型 \(p_\theta(x,z)=p(z)p_\theta(x|z)\)，虚线部分表示用 encoder 近似后验 \(q_\phi(z|x)\)。图片来源：Lilian Weng, From Autoencoder to Beta-VAE。</figcaption>
+          </figure>
+        </section>
+
+        <section class="article-section">
+          <h2>2.5 一个具体例子：手写数字里的潜变量是什么？</h2>
+          <p>如果只看公式，\(z\) 很容易显得抽象。我们用手写数字举例。假设 \(x\) 是一张手写数字图片。图片表面上是像素矩阵，但它背后可能由很多隐藏因素决定：数字类别、书写倾斜角度、笔画粗细、整体位置、个人书写风格、局部弯曲程度等。</p>
+          <p>这些隐藏因素不一定真的一一对应到 \(z\) 的某一维，但 VAE 希望用一个连续潜变量 \(z\) 捕捉它们的主要变化。生成时，先采一个 \(z\)，这个 \(z\) 可以理解为“生成某个样本的隐含说明书”；decoder 再把这份说明书翻译成像素图片。</p>
+          <p>如果 \(z\) 的某个方向学到了“笔画粗细”，那么沿这个方向移动，decoder 输出的数字可能会越来越粗；如果另一个方向学到了“倾斜角度”，沿那个方向移动，数字可能会逐渐旋转。真实模型中这种解释不一定完全干净，但这就是 latent representation 的直觉。</p>
+          <p>为什么要让 \(z\) 连续？因为连续潜空间能表达平滑变化。两个相近的 \(z\) 解码后应该得到相似样本；两个样本的编码之间做插值，也应该得到自然过渡。普通 autoencoder 没有强约束时，潜空间可能到处是洞；VAE 用 KL 把每个样本的编码区域拉向同一个标准高斯先验，就是为了让潜空间更像一个可以连续行走的空间。</p>
+          <div class="insight-box">VAE 中的 \(z\) 不是标签，也不是某个确定语义变量，而是模型为了解释数据变化而学习出的连续隐含原因。</div>
+        </section>
+
+        <section class="article-section">
+          <h2>3. 为什么 \(\log p_\theta(x)\) 难算？</h2>
+          <p>如果我们能直接计算 \(p_\theta(x)\)，训练就很简单：最大化训练集对数似然。</p>
+          <div class="equation">\[
+            \max_\theta
+            \sum_{i=1}^{N}
+            \log p_\theta(x^{(i)}).
+          \]</div>
+          <p>但 VAE 的 \(p_\theta(x)\) 是一个积分：</p>
+          <div class="equation">\[
+            p_\theta(x)=
+            \int p_\theta(x|z)p(z)\,dz.
+          \]</div>
+          <p>如果 \(z\) 维度很低、decoder 很简单，这个积分也许还能算。但实际 VAE 里，\(z\) 往往是几十维、几百维，\(p_\theta(x|z)\) 又由神经网络定义。这个积分没有简单解析解，数值积分也会随维度爆炸。</p>
+          <p>另一个难点是后验分布：</p>
+          <div class="equation">\[
+            p_\theta(z|x)
+            =
+            \frac{p_\theta(x|z)p(z)}{p_\theta(x)}.
+          \]</div>
+          <p>这个后验回答：“给定观察到的 \(x\)，哪些 \(z\) 更可能生成它？”它对理解数据非常重要，但分母 \(p_\theta(x)\) 正是难算的边缘似然。因此真实后验 \(p_\theta(z|x)\) 通常也难算。</p>
+          <div class="insight-box">VAE 的关键动作：用一个可计算的近似后验 \(q_\phi(z|x)\) 替代难算的真实后验 \(p_\theta(z|x)\)，并由此推导出可优化的 ELBO。</div>
+        </section>
+
+        <section class="article-section">
+          <h2>4. 变分后验 \(q_\phi(z|x)\)：encoder 的概率意义</h2>
+          <p>VAE 的 encoder 不是普通 autoencoder 里的确定性编码器。它输出的是一个分布，通常写成：</p>
+          <div class="equation">\[
+            q_\phi(z|x).
+          \]</div>
+          <p>这个分布用来近似真实后验 \(p_\theta(z|x)\)。最常见的选择是对角高斯：</p>
+          <div class="equation">\[
+            q_\phi(z|x)
+            =
+            \mathcal{N}
+            \left(
+            z;
+            \mu_\phi(x),
+            \mathrm{diag}(\sigma_\phi^2(x))
+            \right).
+          \]</div>
+          <p>也就是说，encoder 网络接收 \(x\)，输出两个向量：均值 \(\mu_\phi(x)\) 和标准差 \(\sigma_\phi(x)\)，它们共同定义一个潜变量分布。训练时，我们不是把 \(x\) 编码成一个固定点，而是编码成潜空间里的一个小区域。</p>
+          <p>这样做有两个好处。</p>
+          <ol>
+            <li><strong>不确定性。</strong>同一个 \(x\) 可能对应多个合理潜变量，分布比单点更自然。</li>
+            <li><strong>可生成性。</strong>通过 KL 正则，encoder 产生的潜变量分布会被拉向先验 \(p(z)=\mathcal{N}(0,I)\)，使潜空间更连续、更容易采样。</li>
+          </ol>
+          <p>所以 VAE 的 encoder 有一个很重要的身份：它是一个 inference network，也就是摊销变分推断里的近似后验网络。摊销的意思是，我们不为每个样本单独优化一个变分分布，而是训练一个共享网络 \(q_\phi(z|x)\)，让它看到任何 \(x\) 都能快速给出近似后验。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>4.5 真实后验、近似后验和两个误差来源</h2>
+          <p>为了真正理解 VAE，必须分清三个分布。</p>
+          <ol>
+            <li><strong>先验 \(p(z)\)。</strong>生成前我们相信潜变量大致服从什么分布。最常见是 \(\mathcal{N}(0,I)\)。</li>
+            <li><strong>真实后验 \(p_\theta(z|x)\)。</strong>在当前 decoder 参数 \(\theta\) 下，观察到 \(x\) 后，哪些 \(z\) 更可能生成它。</li>
+            <li><strong>近似后验 \(q_\phi(z|x)\)。</strong>encoder 给出的可计算分布，用来近似真实后验。</li>
+          </ol>
+          <p>真实后验难算，是因为：</p>
+          <div class="equation">\[
+            p_\theta(z|x)
+            =
+            \frac{p_\theta(x|z)p(z)}
+            {\int p_\theta(x|z)p(z)\,dz}.
+          \]</div>
+          <p>分母要对所有 \(z\) 积分。这个积分一难算，后验也跟着难算。变分推断的办法不是硬算它，而是在一个容易处理的分布族里找一个近似。比如我们限定 \(q_\phi(z|x)\) 只能是对角高斯，这样计算和采样都方便。</p>
+          <p>但这样会带来两个误差来源。</p>
+          <p><strong>第一，approximation gap。</strong>如果真实后验本身非常复杂，比如多峰、强相关、弯曲形状，而我们只允许 \(q_\phi(z|x)\) 是对角高斯，那么不管怎么调参数，它都可能无法完全贴近真实后验。这是分布族表达能力不足造成的。</p>
+          <p><strong>第二，amortization gap。</strong>即使对每个样本都存在一个很好的高斯近似，我们也不是为每个样本单独优化一个最优高斯，而是训练一个共享 encoder 网络一次性输出所有样本的近似后验。共享网络带来效率，也可能带来额外误差。</p>
+          <p>为什么还要这样做？因为它非常高效。传统变分推断可能需要对每个样本反复优化局部变分参数；VAE 训练好 encoder 后，给一个新样本 \(x\)，一次前向传播就能得到 \(q_\phi(z|x)\)。这就是摊销推断的价值。</p>
+          <div class="insight-box">VAE 的 encoder 不是简单压缩器，而是在用一个神经网络快速近似每个样本的后验分布。</div>
+        </section>
+
+        <section class="article-section">
+          <h2>5. ELBO 推导一：从 KL 分解看下界</h2>
+          <p>现在推导 VAE 的训练目标。我们希望最大化 \(\log p_\theta(x)\)，但它难算。于是引入任意一个近似后验 \(q_\phi(z|x)\)。考虑它和真实后验之间的 KL 散度：</p>
+          <div class="equation">\[
+            D_{\mathrm{KL}}
+            \left(
+            q_\phi(z|x)\,\|\,p_\theta(z|x)
+            \right)
+            =
+            \mathbb{E}_{q_\phi(z|x)}
+            \left[
+            \log
+            \frac{q_\phi(z|x)}{p_\theta(z|x)}
+            \right].
+          \]</div>
+          <p>把贝叶斯公式代入：</p>
+          <div class="equation">\[
+            p_\theta(z|x)
+            =
+            \frac{p_\theta(x|z)p(z)}{p_\theta(x)}.
+          \]</div>
+          <p>于是：</p>
+          <div class="equation">\[
+            D_{\mathrm{KL}}
+            =
+            \mathbb{E}_{q_\phi}
+            \left[
+            \log q_\phi(z|x)
+            -
+            \log p_\theta(x|z)
+            -
+            \log p(z)
+            +
+            \log p_\theta(x)
+            \right].
+          \]</div>
+          <p>\(\log p_\theta(x)\) 与 \(z\) 无关，所以期望后仍然是它自己：</p>
+          <div class="equation">\[
+            D_{\mathrm{KL}}
+            =
+            \log p_\theta(x)
+            -
+            \mathbb{E}_{q_\phi}
+            [\log p_\theta(x|z)]
+            +
+            \mathbb{E}_{q_\phi}
+            [\log q_\phi(z|x)-\log p(z)].
+          \]</div>
+          <p>最后一项就是 \(D_{\mathrm{KL}}(q_\phi(z|x)\|p(z))\)。整理得到：</p>
+          <div class="equation">\[
+            \log p_\theta(x)
+            =
+            \underbrace{
+            \mathbb{E}_{q_\phi(z|x)}
+            [\log p_\theta(x|z)]
+            -
+            D_{\mathrm{KL}}
+            (q_\phi(z|x)\|p(z))
+            }_{\mathcal{L}(\theta,\phi;x)}
+            +
+            D_{\mathrm{KL}}
+            (q_\phi(z|x)\|p_\theta(z|x)).
+          \]</div>
+          <p>由于 KL 散度总是非负，得到：</p>
+          <div class="equation">\[
+            \log p_\theta(x)
+            \geq
+            \mathcal{L}(\theta,\phi;x).
+          \]</div>
+          <p>这个 \(\mathcal{L}\) 就是 ELBO，Evidence Lower Bound，也就是边缘对数似然的下界。最大化 ELBO 有两层含义：一方面提高数据似然的下界，另一方面让近似后验 \(q_\phi(z|x)\) 接近真实后验 \(p_\theta(z|x)\)。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>6. ELBO 推导二：从 Jensen 不等式看下界</h2>
+          <p>同一个 ELBO 还可以从 Jensen 不等式直接推出。先把 \(q_\phi(z|x)\) 乘进去再除出来：</p>
+          <div class="equation">\[
+            \log p_\theta(x)
+            =
+            \log
+            \int
+            q_\phi(z|x)
+            \frac{p_\theta(x|z)p(z)}
+            {q_\phi(z|x)}
+            dz.
+          \]</div>
+          <p>把积分写成 \(q_\phi\) 下的期望：</p>
+          <div class="equation">\[
+            \log p_\theta(x)
+            =
+            \log
+            \mathbb{E}_{q_\phi(z|x)}
+            \left[
+            \frac{p_\theta(x|z)p(z)}
+            {q_\phi(z|x)}
+            \right].
+          \]</div>
+          <p>因为 \(\log\) 是凹函数，Jensen 不等式给出：</p>
+          <div class="equation">\[
+            \log \mathbb{E}[Y]
+            \geq
+            \mathbb{E}[\log Y].
+          \]</div>
+          <p>所以：</p>
+          <div class="equation">\[
+            \log p_\theta(x)
+            \geq
+            \mathbb{E}_{q_\phi}
+            \left[
+            \log p_\theta(x|z)
+            +
+            \log p(z)
+            -
+            \log q_\phi(z|x)
+            \right].
+          \]</div>
+          <p>拆开后就是：</p>
+          <div class="equation">\[
+            \mathcal{L}(\theta,\phi;x)
+            =
+            \mathbb{E}_{q_\phi(z|x)}
+            [\log p_\theta(x|z)]
+            -
+            D_{\mathrm{KL}}
+            (q_\phi(z|x)\|p(z)).
+          \]</div>
+          <p>这两个推导角度互补。KL 分解告诉我们 ELBO 和真实后验的差距是什么；Jensen 推导告诉我们为什么它一定是 \(\log p_\theta(x)\) 的下界。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>7. ELBO 的两个部分：重建项和正则项</h2>
+          <p>ELBO 有两个部分：</p>
+          <div class="equation">\[
+            \mathcal{L}
+            =
+            \underbrace{
+            \mathbb{E}_{q_\phi(z|x)}
+            [\log p_\theta(x|z)]
+            }_{\text{重建项}}
+            -
+            \underbrace{
+            D_{\mathrm{KL}}(q_\phi(z|x)\|p(z))
+            }_{\text{正则项}}.
+          \]</div>
+          <p><strong>重建项</strong>要求从 \(x\) 推断出的 \(z\) 能够通过 decoder 重新解释 \(x\)。如果 \(p_\theta(x|z)\) 给真实 \(x\) 高概率，那么 \(\log p_\theta(x|z)\) 就大。</p>
+          <p><strong>KL 正则项</strong>要求 encoder 给出的 \(q_\phi(z|x)\) 不要离先验 \(p(z)\) 太远。它防止每个样本把自己编码到潜空间里互不相干的孤岛上。只有潜空间整体接近标准高斯，我们才能在生成时从 \(p(z)\) 中随便采样并解码。</p>
+          <p>训练时通常最小化负 ELBO：</p>
+          <div class="equation">\[
+            \mathcal{J}(\theta,\phi;x)
+            =
+            -
+            \mathcal{L}
+            =
+            -
+            \mathbb{E}_{q_\phi(z|x)}
+            [\log p_\theta(x|z)]
+            +
+            D_{\mathrm{KL}}(q_\phi(z|x)\|p(z)).
+          \]</div>
+          <p>这就是代码里常见的形式：</p>
+          <div class="equation">\[
+            \mathrm{loss}
+            =
+            \mathrm{reconstruction\ loss}
+            +
+            \mathrm{KL\ loss}.
+          \]</div>
+          <p>但一定要记住，这不是两个随便拼起来的工程损失。它们是从最大化 \(\log p_\theta(x)\) 的下界严格推导出来的。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>7.5 从信息瓶颈理解 ELBO</h2>
+          <p>ELBO 还有一个非常有用的直觉：它像是在做信息瓶颈。重建项希望 \(z\) 尽可能保留 \(x\) 的信息；KL 项希望 \(q_\phi(z|x)\) 不要离先验太远，也就是不要把每个样本编码得过于特殊。</p>
+          <p>如果只有重建项，模型会倾向于把 \(x\) 的所有细节都塞进 \(z\)，像普通 autoencoder 一样追求完美重建。这样训练集重建可能很好，但潜空间可能变得支离破碎。生成时从 \(\mathcal{N}(0,I)\) 随机采样，可能落到 decoder 没见过的区域。</p>
+          <p>如果 KL 项太强，\(q_\phi(z|x)\) 会被压得几乎等于 \(p(z)\)，也就是：</p>
+          <div class="equation">\[
+            q_\phi(z|x)\approx p(z).
+          \]</div>
+          <p>这时 \(z\) 几乎不再携带关于 \(x\) 的信息。decoder 接收到的潜变量和输入样本关系很弱，重建质量就会下降，甚至出现 posterior collapse。</p>
+          <p>因此 VAE 的训练不是单纯追求重建，也不是单纯追求潜空间标准高斯，而是在两者之间找平衡：</p>
+          <div class="equation">\[
+            \text{好的 VAE}
+            =
+            \text{足够表达数据}
+            +
+            \text{潜空间足够规整}.
+          \]</div>
+          <p>这也解释了为什么 β-VAE 只改一个 \(\beta\) 就能显著改变模型行为。它本质上是在调信息瓶颈的强度：\(\beta\) 越大，瓶颈越窄；\(\beta\) 越小，瓶颈越宽。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>8. Decoder likelihood：为什么有时是 BCE，有时是 MSE？</h2>
+          <p>重建项的具体形式取决于我们怎么定义 \(p_\theta(x|z)\)。</p>
+          <p>如果 \(x\) 是二值图像，比如每个像素是 0 或 1，可以令：</p>
+          <div class="equation">\[
+            p_\theta(x|z)
+            =
+            \prod_{j}
+            \mathrm{Bernoulli}
+            (x_j;\pi_{\theta,j}(z)).
+          \]</div>
+          <p>于是负对数似然就是 binary cross entropy：</p>
+          <div class="equation">\[
+            -\log p_\theta(x|z)
+            =
+            -
+            \sum_j
+            \left[
+            x_j\log \pi_{\theta,j}(z)
+            +
+            (1-x_j)
+            \log(1-\pi_{\theta,j}(z))
+            \right].
+          \]</div>
+          <p>如果 \(x\) 是连续变量，可以令：</p>
+          <div class="equation">\[
+            p_\theta(x|z)
+            =
+            \mathcal{N}
+            (x;\mu_\theta(z),\sigma_x^2 I).
+          \]</div>
+          <p>如果 \(\sigma_x^2\) 固定，那么负对数似然和 MSE 只差常数与比例系数：</p>
+          <div class="equation">\[
+            -\log p_\theta(x|z)
+            =
+            \frac{1}{2\sigma_x^2}
+            \|x-\mu_\theta(z)\|^2
+            +
+            \mathrm{const}.
+          \]</div>
+          <p>所以，BCE 和 MSE 不是凭感觉选的。它们对应不同的观测分布假设。读 VAE 代码时，看到 reconstruction loss，要先问：这里假设 \(p_\theta(x|z)\) 是什么分布？</p>
+        </section>
+
+        <section class="article-section">
+          <h2>9. 重参数化技巧：随机采样如何反向传播？</h2>
+          <p>VAE 训练时需要优化：</p>
+          <div class="equation">\[
+            \mathbb{E}_{q_\phi(z|x)}
+            [\log p_\theta(x|z)].
+          \]</div>
+          <p>问题是 \(z\) 是从 \(q_\phi(z|x)\) 里采样出来的，而这个分布又依赖 \(\phi\)。如果直接写 \(z\sim q_\phi(z|x)\)，采样操作看起来像一个不可微的随机节点，梯度怎么传回 encoder？</p>
+          <p>重参数化技巧的想法是：不要直接从依赖 \(\phi\) 的分布里采样，而是从一个不依赖 \(\phi\) 的标准噪声分布里采样，再用可微变换得到 \(z\)。对于对角高斯：</p>
+          <div class="equation">\[
+            z\sim
+            \mathcal{N}
+            (\mu_\phi(x),\mathrm{diag}(\sigma_\phi^2(x)))
+          \]</div>
+          <p>可以改写为：</p>
+          <div class="equation">\[
+            \epsilon\sim\mathcal{N}(0,I),
+            \qquad
+            z=\mu_\phi(x)+\sigma_\phi(x)\odot\epsilon.
+          \]</div>
+          <p>这样随机性全部来自 \(\epsilon\)，而 \(\mu_\phi(x)\)、\(\sigma_\phi(x)\) 到 \(z\) 的路径是可微的。于是：</p>
+          <div class="equation">\[
+            \nabla_\phi
+            \mathbb{E}_{q_\phi(z|x)}
+            [f(z)]
+            =
+            \nabla_\phi
+            \mathbb{E}_{\epsilon\sim\mathcal{N}(0,I)}
+            [
+            f(\mu_\phi(x)+\sigma_\phi(x)\odot\epsilon)
+            ].
+          \]</div>
+          <p>实际训练时用 Monte Carlo 近似这个期望，通常每个样本采一个 \(\epsilon\) 就够了：</p>
+          <div class="equation">\[
+            \mathbb{E}_{q_\phi(z|x)}
+            [\log p_\theta(x|z)]
+            \approx
+            \log p_\theta
+            (x|z),
+            \qquad
+            z=\mu_\phi(x)+\sigma_\phi(x)\odot\epsilon.
+          \]</div>
+
+          <figure class="source-figure">
+            <img src="https://lilianweng.github.io/posts/2018-08-12-vae/vae-gaussian.png" alt="高斯 VAE 架构与重参数化" loading="lazy" />
+            <figcaption>参考图：高斯 VAE 中 encoder 输出 \(\mu\) 和 \(\sigma\)，通过重参数化采样 \(z\)，再由 decoder 重建 \(x\)。图片来源：Lilian Weng, From Autoencoder to Beta-VAE。</figcaption>
+          </figure>
+        </section>
+
+        <section class="article-section">
+          <h2>10. 高斯 KL 的闭式公式</h2>
+          <p>VAE 最常见设定是：</p>
+          <div class="equation">\[
+            q_\phi(z|x)
+            =
+            \mathcal{N}
+            (z;\mu,\mathrm{diag}(\sigma^2)),
+            \qquad
+            p(z)=\mathcal{N}(0,I).
+          \]</div>
+          <p>此时 KL 有闭式解：</p>
+          <div class="equation">\[
+            D_{\mathrm{KL}}
+            (q_\phi(z|x)\|p(z))
+            =
+            \frac{1}{2}
+            \sum_{j=1}^{d}
+            \left(
+            \mu_j^2+\sigma_j^2-\log\sigma_j^2-1
+            \right).
+          \]</div>
+          <p>我们推一维情形。设 \(q(z)=\mathcal{N}(\mu,\sigma^2)\)，\(p(z)=\mathcal{N}(0,1)\)。</p>
+          <div class="equation">\[
+            D_{\mathrm{KL}}(q\|p)
+            =
+            \mathbb{E}_q[\log q(z)-\log p(z)].
+          \]</div>
+          <p>两个 log density 分别是：</p>
+          <div class="equation">\[
+            \log q(z)
+            =
+            -\frac{1}{2}\log(2\pi\sigma^2)
+            -
+            \frac{(z-\mu)^2}{2\sigma^2},
+          \]</div>
+          <div class="equation">\[
+            \log p(z)
+            =
+            -\frac{1}{2}\log(2\pi)
+            -
+            \frac{z^2}{2}.
+          \]</div>
+          <p>相减再对 \(q\) 取期望：</p>
+          <div class="equation">\[
+            D_{\mathrm{KL}}(q\|p)
+            =
+            -\frac{1}{2}\log\sigma^2
+            -
+            \frac{1}{2}
+            \mathbb{E}_q
+            \left[
+            \frac{(z-\mu)^2}{\sigma^2}
+            \right]
+            +
+            \frac{1}{2}
+            \mathbb{E}_q[z^2].
+          \]</div>
+          <p>因为 \(z\sim\mathcal{N}(\mu,\sigma^2)\)，所以：</p>
+          <div class="equation">\[
+            \mathbb{E}_q[(z-\mu)^2]=\sigma^2,
+            \qquad
+            \mathbb{E}_q[z^2]=\mu^2+\sigma^2.
+          \]</div>
+          <p>代入得到：</p>
+          <div class="equation">\[
+            D_{\mathrm{KL}}(q\|p)
+            =
+            \frac{1}{2}
+            \left(
+            \mu^2+\sigma^2-\log\sigma^2-1
+            \right).
+          \]</div>
+          <p>多维对角高斯就是把每一维相加。这个 KL 项会推动 \(\mu_j\) 接近 0，推动 \(\sigma_j^2\) 接近 1。重建项则希望 \(z\) 携带足够信息来还原 \(x\)。VAE 的潜空间质量，正是在这两股力量之间形成的。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>11. VAE 训练算法：从公式到代码</h2>
+          <p>对一个 minibatch，VAE 的训练流程可以写成：</p>
+          <ol>
+            <li>输入样本 \(x\)。</li>
+            <li>encoder 输出 \(\mu_\phi(x)\) 和 \(\log\sigma_\phi^2(x)\)。</li>
+            <li>采样 \(\epsilon\sim\mathcal{N}(0,I)\)。</li>
+            <li>用重参数化得到 \(z=\mu+\sigma\odot\epsilon\)。</li>
+            <li>decoder 根据 \(z\) 输出 \(p_\theta(x|z)\) 的参数。</li>
+            <li>计算重建损失和 KL 损失。</li>
+            <li>最小化负 ELBO，更新 \(\theta,\phi\)。</li>
+          </ol>
+          <p>常见实现会让网络输出 log variance，也就是 \(\log\sigma^2\)，记作 \(\mathrm{logvar}\)。这样可以避免直接预测方差时出现负数。标准差由：</p>
+          <div class="equation">\[
+            \sigma=\exp\left(\frac{1}{2}\mathrm{logvar}\right)
+          \]</div>
+          <p>得到。KL 项可以写成代码里非常常见的形式：</p>
+          <div class="equation">\[
+            D_{\mathrm{KL}}
+            =
+            -\frac{1}{2}
+            \sum_j
+            \left(
+            1+\mathrm{logvar}_j-\mu_j^2-\exp(\mathrm{logvar}_j)
+            \right).
+          \]</div>
+          <p>这个式子和上一节的：</p>
+          <div class="equation">\[
+            \frac{1}{2}
+            \sum_j
+            \left(
+            \mu_j^2+\sigma_j^2-\log\sigma_j^2-1
+            \right)
+          \]</div>
+          <p>完全一样，只是把 \(\sigma_j^2=\exp(\mathrm{logvar}_j)\) 代进去并整理了符号。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>11.5 代码变量和数学符号怎么对应？</h2>
+          <p>初学者写 VAE 代码时经常卡在变量名上。下面把数学对象翻译成常见代码对象。</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>数学符号</th><th>代码里常见名字</th><th>含义</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>\(x\)</td><td>input, x</td><td>输入样本，例如一张图片。</td></tr>
+                <tr><td>\(\mu_\phi(x)\)</td><td>mu</td><td>encoder 输出的潜变量均值。</td></tr>
+                <tr><td>\(\log\sigma_\phi^2(x)\)</td><td>logvar</td><td>encoder 输出的潜变量 log variance。</td></tr>
+                <tr><td>\(\epsilon\)</td><td>eps</td><td>标准高斯噪声，和网络参数无关。</td></tr>
+                <tr><td>\(z\)</td><td>z</td><td>通过重参数化得到的潜变量样本。</td></tr>
+                <tr><td>\(p_\theta(x|z)\)</td><td>decoder output</td><td>decoder 定义的观测分布参数。</td></tr>
+                <tr><td>\(-\mathbb{E}\log p_\theta(x|z)\)</td><td>recon_loss</td><td>重建负对数似然，可能是 BCE 或 MSE。</td></tr>
+                <tr><td>\(D_{\mathrm{KL}}(q_\phi(z|x)\|p(z))\)</td><td>kl_loss</td><td>把近似后验拉向先验的正则项。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>一次训练前向传播可以写成概念伪代码：</p>
+          <div class="equation">\[
+            \mu,\mathrm{logvar}
+            =
+            \mathrm{Encoder}_\phi(x),
+          \]</div>
+          <div class="equation">\[
+            \epsilon\sim\mathcal{N}(0,I),
+            \qquad
+            z=\mu+\exp(0.5\mathrm{logvar})\odot\epsilon,
+          \]</div>
+          <div class="equation">\[
+            \hat{x}
+            =
+            \mathrm{Decoder}_\theta(z),
+          \]</div>
+          <div class="equation">\[
+            \mathrm{loss}
+            =
+            \mathrm{recon\_loss}(x,\hat{x})
+            +
+            \mathrm{kl\_loss}(\mu,\mathrm{logvar}).
+          \]</div>
+          <p>这四行看起来像普通神经网络训练，但每一行都对应前面的概率推导。encoder 不是随便输出两个向量，而是在参数化 \(q_\phi(z|x)\)；采样不是普通噪声增强，而是在估计 ELBO 的期望；decoder 输出不是简单图片，而是在参数化 \(p_\theta(x|z)\)；loss 也不是经验拼接，而是负 ELBO。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>12. 训练完成后如何生成？</h2>
+          <p>VAE 生成新样本时不需要 encoder。流程非常简单：</p>
+          <ol>
+            <li>从先验采样 \(z\sim\mathcal{N}(0,I)\)。</li>
+            <li>把 \(z\) 输入 decoder。</li>
+            <li>从 \(p_\theta(x|z)\) 中采样，或者直接取 decoder 输出的均值作为生成结果。</li>
+          </ol>
+          <p>这点和训练过程不同。训练时 encoder 用来构造近似后验 \(q_\phi(z|x)\)，帮助优化 ELBO；生成时我们没有输入样本 \(x\)，所以直接从先验开始。</p>
+          <p>VAE 还可以做 latent interpolation。给两张图 \(x_a,x_b\)，用 encoder 得到两个潜空间均值 \(\mu_a,\mu_b\)，然后在二者之间插值：</p>
+          <div class="equation">\[
+            z_\lambda=(1-\lambda)\mu_a+\lambda\mu_b,
+            \qquad
+            0\leq \lambda\leq 1.
+          \]</div>
+          <p>再把 \(z_\lambda\) 输入 decoder，就能观察生成样本如何连续变化。如果潜空间被 KL 正则得比较平滑，插值通常也会比较自然。这正是 VAE 比普通 autoencoder 更适合作为生成模型的原因之一。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>12.5 聚合后验：为什么只约束每个 \(q_\phi(z|x)\) 还不够？</h2>
+          <p>前面一直在说让 \(q_\phi(z|x)\) 接近先验 \(p(z)\)。但从整体生成角度，还可以看另一个对象：聚合后验，也叫 aggregated posterior。</p>
+          <div class="equation">\[
+            q_\phi(z)
+            =
+            \int q_\phi(z|x)p_{\mathrm{data}}(x)\,dx.
+          \]</div>
+          <p>它表示：如果先从真实数据分布里抽一个 \(x\)，再用 encoder 抽一个 \(z\)，最终得到的 \(z\) 在潜空间里整体服从什么分布。训练时 decoder 看到的 \(z\)，大体来自这个聚合后验；生成时 decoder 看到的 \(z\)，来自先验 \(p(z)\)。</p>
+          <p>如果 \(q_\phi(z)\) 和 \(p(z)\) 差得很远，就会出现 train-test mismatch。训练时 decoder 习惯了某些潜空间区域，生成时却从标准高斯的其他区域采样，结果可能变差。</p>
+          <p>VAE 的 KL 项是逐样本的：</p>
+          <div class="equation">\[
+            \mathbb{E}_{p_{\mathrm{data}}(x)}
+            D_{\mathrm{KL}}
+            (q_\phi(z|x)\|p(z)).
+          \]</div>
+          <p>它会间接推动聚合后验靠近先验，但这个约束有时太强，有时又不够精细。太强时，每个样本的后验都被压向同一个标准高斯，潜变量信息不足；不够精细时，聚合后验可能有复杂结构，而简单标准高斯先验无法匹配。</p>
+          <p>这也是很多 VAE 后续工作会改先验的原因。例如使用 mixture prior、VampPrior、normalizing flow prior 等，让 \(p(z)\) 更接近模型实际学到的潜空间结构。读这些论文时，核心问题就是：标准高斯先验是不是太简单？如果太简单，我们该怎么让生成时采样的 \(z\) 更接近训练时 decoder 熟悉的 \(z\)？</p>
+        </section>
+
+        <section class="article-section">
+          <h2>13. 为什么 VAE 有时会生成模糊图像？</h2>
+          <p>很多人第一次训练 VAE，会发现生成图像偏模糊。这不是偶然现象，和目标函数有关。</p>
+          <p>如果 decoder likelihood 设成固定方差高斯，那么最大化 \(\log p_\theta(x|z)\) 等价于最小化 MSE。MSE 在面对多种可能输出时，容易倾向于平均解。比如同一个潜变量附近可能对应多种合理边缘或纹理，取平均就会变模糊。</p>
+          <p>另一个原因是 KL 正则会限制潜变量携带的信息。KL 太强时，\(q_\phi(z|x)\) 被迫非常接近 \(p(z)\)，不同样本的编码差别变小，decoder 得到的信息不足，也可能生成较模糊的结果。</p>
+          <p>更强的 decoder 也可能导致 posterior collapse。此时 decoder 自己就能很好地建模数据，不太需要看 \(z\)，于是 \(q_\phi(z|x)\) 退化到接近 \(p(z)\)，潜变量被忽略。这个问题在文本 VAE 或很强自回归 decoder 中尤其常见。</p>
+          <div class="insight-box">VAE 的模糊不是“模型坏了”这么简单，而是 likelihood 选择、KL 强度、decoder 表达能力和潜变量使用方式共同作用的结果。</div>
+        </section>
+
+        <section class="article-section">
+          <h2>13.5 Posterior Collapse 更细地看</h2>
+          <p>posterior collapse 指的是近似后验退化到先验：</p>
+          <div class="equation">\[
+            q_\phi(z|x)\approx p(z).
+          \]</div>
+          <p>此时 KL 项接近 0，看起来 loss 里 KL 很漂亮，但这反而可能说明模型没有使用潜变量。因为如果 \(q_\phi(z|x)\) 和 \(p(z)\) 几乎一样，那么 \(z\) 中几乎没有关于 \(x\) 的信息。decoder 生成时主要靠自己的条件建模能力，而不是靠潜变量传来的信息。</p>
+          <p>为什么会发生？一个直觉解释是：ELBO 同时奖励重建、惩罚偏离先验。如果 decoder 很强，它即使不看 \(z\) 也能把训练数据建模得不错；那 encoder 继续把信息塞进 \(z\) 只会增加 KL 惩罚。优化器可能找到一个“省事”的方案：让 \(q_\phi(z|x)\) 贴近 \(p(z)\)，把潜变量关掉。</p>
+          <p>常见缓解方法包括：</p>
+          <ol>
+            <li><strong>KL annealing。</strong>训练早期让 KL 权重较小，让模型先学会使用 \(z\)，之后再逐渐增大 KL 权重。</li>
+            <li><strong>free bits。</strong>允许每个潜变量维度保留一定信息量，不让 KL 太快压到 0。</li>
+            <li><strong>限制 decoder 过强。</strong>如果 decoder 可以完全绕过 \(z\)，潜变量就容易失去作用。</li>
+            <li><strong>更灵活的后验或先验。</strong>例如 normalizing flow posterior、VampPrior 等方法，让近似分布族更匹配真实后验。</li>
+          </ol>
+          <p>读实验曲线时，如果看到 KL loss 快速降到接近 0，同时重建还不错，不要立刻高兴。你需要检查 latent 是否真的携带信息，比如做 latent traversal、互信息估计，或者观察随机采样和插值效果。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>14. β-VAE、IWAE 和常见扩展</h2>
+          <p><strong>β-VAE</strong>把 ELBO 中的 KL 项乘上一个系数：</p>
+          <div class="equation">\[
+            \mathcal{L}_{\beta}
+            =
+            \mathbb{E}_{q_\phi(z|x)}
+            [\log p_\theta(x|z)]
+            -
+            \beta
+            D_{\mathrm{KL}}(q_\phi(z|x)\|p(z)).
+          \]</div>
+          <p>当 \(\beta>1\) 时，模型更强调潜空间接近先验，可能得到更 disentangled 的表示，但重建质量可能下降。当 \(\beta<1\) 时，潜变量可以携带更多信息，重建可能更好，但潜空间可能不够规整。</p>
+          <p><strong>IWAE</strong>，Importance Weighted Autoencoder，用多个 \(z\) 样本构造更紧的似然下界：</p>
+          <div class="equation">\[
+            \log p_\theta(x)
+            \geq
+            \mathbb{E}_{z_1,\ldots,z_K\sim q_\phi(z|x)}
+            \left[
+            \log
+            \frac{1}{K}
+            \sum_{k=1}^{K}
+            \frac{p_\theta(x,z_k)}
+            {q_\phi(z_k|x)}
+            \right].
+          \]</div>
+          <p>当 \(K=1\) 时，它退回普通 VAE 的 ELBO。\(K\) 越大，下界通常越紧，但计算更贵。</p>
+          <p><strong>Conditional VAE</strong>在生成时加入条件 \(y\)，例如类别标签或文本条件：</p>
+          <div class="equation">\[
+            p_\theta(x|y)
+            =
+            \int p_\theta(x|z,y)p(z|y)\,dz.
+          \]</div>
+          <p>它适合做条件生成，比如给定类别生成图片、给定属性生成样本。核心推导仍然是 ELBO，只是所有分布都多了条件 \(y\)。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>14.5 读 VAE 论文时应该抓住什么？</h2>
+          <p>VAE 系列论文很多，但大多数都可以放回同一个框架里拆解。读论文时可以问五个问题。</p>
+          <ol>
+            <li><strong>先验 \(p(z)\) 改了吗？</strong>标准 VAE 用 \(\mathcal{N}(0,I)\)。有些工作会使用更复杂先验，让潜空间更贴近聚合后验。</li>
+            <li><strong>后验族 \(q_\phi(z|x)\) 改了吗？</strong>标准 VAE 用对角高斯。有些工作用 normalizing flows 增强后验表达能力。</li>
+            <li><strong>下界改了吗？</strong>IWAE 改的是下界，用多个重要性样本让 bound 更紧。</li>
+            <li><strong>KL 权重改了吗？</strong>β-VAE、capacity annealing 等方法改的是重建和正则之间的权衡。</li>
+            <li><strong>decoder likelihood 改了吗？</strong>图像、文本、音频、分子数据的观测分布不同，重建项的含义也不同。</li>
+          </ol>
+          <p>这样读论文会清楚很多。不要只看模型名字，而要问它到底动了 VAE 框架里的哪一块：先验、后验、下界、decoder、训练策略，还是潜变量解释方式。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>15. VAE 和 Diffusion 的关系</h2>
+          <p>VAE 和 Diffusion 都是生成模型，但思路不同。</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>问题</th><th>VAE</th><th>Diffusion</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>潜变量</td><td>通常是一层或少数层 \(z\)</td><td>整条噪声路径 \(x_1,\ldots,x_T\) 都可看成隐变量</td></tr>
+                <tr><td>训练目标</td><td>最大化 ELBO：重建项减 KL</td><td>变分下界可化成逐步去噪或噪声预测目标</td></tr>
+                <tr><td>生成方式</td><td>一次采样 \(z\)，一次或少数次解码</td><td>从噪声开始多步迭代采样</td></tr>
+                <tr><td>优势</td><td>潜空间清晰、推断快、适合表示学习</td><td>生成质量强，逐步细化能力好</td></tr>
+                <tr><td>常见问题</td><td>模糊、posterior collapse、ELBO gap</td><td>采样慢、schedule 和采样器复杂</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>现代 Latent Diffusion 还会把 VAE 作为压缩模块：先用 VAE 把图像压到 latent space，再在 latent space 里训练 Diffusion。此时 VAE 负责把像素空间压缩成更便宜的连续表示，Diffusion 负责在这个表示空间中建模复杂生成分布。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>15.5 如何评价一个 VAE？</h2>
+          <p>评价 VAE 不能只看一张生成图。至少要分几个层面。</p>
+          <p><strong>第一，看 ELBO。</strong>ELBO 是训练目标，也是 \(\log p_\theta(x)\) 的下界。ELBO 越高，通常说明模型对数据的解释越好。但不同 likelihood、不同数据预处理下，ELBO 数值不一定能直接横向比较。</p>
+          <p><strong>第二，看重建质量。</strong>输入 \(x\)，经过 encoder 和 decoder 得到重建 \(\hat{x}\)。如果重建很差，说明 \(z\) 或 decoder 没有学到足够信息。但重建太好也不一定代表生成好，因为模型可能只是把训练数据压缩记住了。</p>
+          <p><strong>第三，看随机采样。</strong>从 \(p(z)\) 采样再 decode，得到的样本是否自然、多样、覆盖数据分布？这是生成模型最直接的检验。重建好但随机采样差，常常说明潜空间和先验匹配不好。</p>
+          <p><strong>第四，看插值和 latent traversal。</strong>插值能检查潜空间是否连续；沿某一维移动能检查潜变量是否学到可解释变化。如果插值中间出现奇怪样本，说明潜空间可能有洞或 decoder 对某些区域不熟悉。</p>
+          <p><strong>第五，看 KL 使用情况。</strong>如果 KL 几乎为 0，要警惕 posterior collapse；如果 KL 特别大，可能说明潜空间很不规整，生成时从先验采样会有 mismatch。好的 VAE 通常需要在重建和 KL 之间找到合理平衡。</p>
+          <p>所以评价 VAE 时，可以用一句话提醒自己：重建检查 encoder 和 decoder 是否能解释已有数据，采样检查先验和 decoder 是否能生成新数据，KL 检查潜空间是否真的被合理使用。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>16. 多轮自检：这篇 VAE 是否真的讲通了？</h2>
+          <p>最后按初学者视角反复检查。每个问题后面都给出回看位置。如果答不上来，就说明对应环节还没有完全打通。</p>
+
+          <h3>第一轮：对象有没有分清？</h3>
+          <p><strong>检查一：你能否解释普通 autoencoder 和 VAE 的根本区别？</strong>普通 autoencoder 通常把 \(x\) 编码成确定性 \(h\)，VAE 把 \(x\) 编码成分布 \(q_\phi(z|x)\)，并且规定可采样先验 \(p(z)\)。卡住时回到第 1 节和第 4 节。</p>
+          <p><strong>检查二：你能否写出 VAE 的生成过程？</strong>应该能写出 \(z\sim p(z)\)，\(x\sim p_\theta(x|z)\)，并解释 \(p_\theta(x)=\int p_\theta(x|z)p(z)dz\)。卡住时回到第 2 节。</p>
+          <p><strong>检查三：你能否解释 encoder 为什么叫近似后验？</strong>它不是生成模型本身，而是用 \(q_\phi(z|x)\) 近似难算的 \(p_\theta(z|x)\)。卡住时回到第 3 节和第 4 节。</p>
+
+          <h3>第二轮：推导能不能自己复现？</h3>
+          <p><strong>检查四：你能否从 KL 分解推出 ELBO？</strong>关键是把 \(p_\theta(z|x)=p_\theta(x|z)p(z)/p_\theta(x)\) 代入 \(D_{\mathrm{KL}}(q_\phi(z|x)\|p_\theta(z|x))\)，然后整理出 \(\log p_\theta(x)=\mathrm{ELBO}+\mathrm{KL}\)。卡住时回到第 5 节。</p>
+          <p><strong>检查五：你能否用 Jensen 不等式再推一次 ELBO？</strong>关键是把 \(q_\phi(z|x)\) 乘进去再除出来，把积分写成期望，然后用 \(\log\mathbb{E}[Y]\geq\mathbb{E}[\log Y]\)。卡住时回到第 6 节。</p>
+          <p><strong>检查六：你能否推导高斯 KL 闭式？</strong>至少要能在一维情形下写出 \(\log q-\log p\)，再用 \(\mathbb{E}_q[(z-\mu)^2]=\sigma^2\) 和 \(\mathbb{E}_q[z^2]=\mu^2+\sigma^2\)。卡住时回到第 10 节。</p>
+
+          <h3>第三轮：训练和代码能否对应？</h3>
+          <p><strong>检查七：你能否解释重参数化技巧为什么必要？</strong>它把 \(z\sim q_\phi(z|x)\) 改写成 \(z=\mu_\phi(x)+\sigma_\phi(x)\odot\epsilon\)，让随机性来自不依赖参数的 \(\epsilon\)，梯度可以穿过 \(\mu,\sigma\)。卡住时回到第 9 节。</p>
+          <p><strong>检查八：你能否解释 reconstruction loss 为什么有时是 BCE、有时是 MSE？</strong>它取决于 decoder likelihood。Bernoulli likelihood 对应 BCE，固定方差 Gaussian likelihood 对应 MSE。卡住时回到第 8 节。</p>
+          <p><strong>检查九：你能否把代码里的 KL 公式和数学 KL 对上？</strong>代码常用 \(-\frac{1}{2}\sum(1+\mathrm{logvar}-\mu^2-\exp(\mathrm{logvar}))\)，它就是高斯 KL 闭式的 log variance 写法。卡住时回到第 10 节和第 11 节。</p>
+
+          <h3>第四轮：能不能读后续论文？</h3>
+          <p><strong>检查十：你能否解释 β-VAE 改了什么？</strong>它改变的是 KL 正则强度，也就是重建质量和潜空间规整之间的权衡。卡住时回到第 14 节。</p>
+          <p><strong>检查十一：你能否解释 IWAE 为什么是更紧下界？</strong>它用多个重要性样本估计边缘似然下界，\(K=1\) 时退化为普通 VAE。卡住时回到第 14 节。</p>
+          <p><strong>检查十二：你能否说明 VAE 和 Diffusion 的共同点与区别？</strong>共同点是都在最大化或近似最大化数据似然、学习生成分布；区别是 VAE 用潜变量积分和 ELBO，Diffusion 用逐步噪声路径和去噪目标。卡住时回到第 15 节。</p>
+          <p><strong>检查十三：你能否评价一个 VAE 是不是学好了？</strong>不能只看重建，也不能只看采样。应该同时看 ELBO、重建、随机采样、插值、latent traversal 和 KL 使用情况。卡住时回到第 12.5 节和第 15.5 节。</p>
+          <p>如果这十三个问题能顺畅回答，说明你已经不是在背 VAE 公式，而是真正理解了 VAE 为什么需要变分推断、为什么 ELBO 合理、为什么重参数化能训练、为什么 KL 会塑造潜空间。之后读 Kingma & Welling、Rezende、IWAE、β-VAE 或 Latent Diffusion 相关论文时，就能知道作者是在改先验、改后验族、改下界、改 decoder，还是改潜空间使用方式。</p>
+        </section>
+
+        <section class="article-section references">
+          <h2>参考资料</h2>
+          <ul>
+            <li><a href="https://arxiv.org/abs/1312.6114" target="_blank" rel="noreferrer">Kingma and Welling, Auto-Encoding Variational Bayes, 2013</a></li>
+            <li><a href="https://arxiv.org/abs/1401.4082" target="_blank" rel="noreferrer">Rezende, Mohamed, Wierstra, Stochastic Backpropagation and Approximate Inference in Deep Generative Models, 2014</a></li>
+            <li><a href="https://arxiv.org/abs/1906.02691" target="_blank" rel="noreferrer">Kingma and Welling, An Introduction to Variational Autoencoders, 2019</a></li>
+            <li><a href="https://arxiv.org/abs/1509.00519" target="_blank" rel="noreferrer">Burda, Grosse, Salakhutdinov, Importance Weighted Autoencoders, 2015</a></li>
+            <li><a href="https://openreview.net/forum?id=Sy2fzU9gl" target="_blank" rel="noreferrer">Higgins et al., beta-VAE, 2017</a></li>
+            <li><a href="https://lilianweng.github.io/posts/2018-08-12-vae/" target="_blank" rel="noreferrer">Lilian Weng, From Autoencoder to Beta-VAE</a></li>
+          </ul>
+        </section>
+      `,
+    },
+    {
       slug: "what-is-generative-model",
       title: "生成模型入门：从概率分布到分布拟合",
       date: "2026-05-22",
@@ -1475,17 +2266,21 @@ window.siteContent = {
     },
   ],
   tags: [
+    "VAE",
     "Diffusion Model",
     "Generative Model",
     "Machine Learning",
     "Probability",
     "Maximum Likelihood",
     "KL Divergence",
+    "Variational Inference",
+    "ELBO",
+    "Latent Variable Model",
     "DDPM",
     "Score Matching",
     "Flow Matching",
     "SDE",
     "ODE"
   ],
-  categories: [{ name: "学习笔记", count: 2 }],
+  categories: [{ name: "学习笔记", count: 3 }],
 };
