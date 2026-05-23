@@ -449,6 +449,103 @@ window.siteContent = {
         </section>
 
         <section class="article-section">
+          <h2>9.5 开山论文到底贡献了什么？SGVB 与 AEVB</h2>
+          <p>Kingma 和 Welling 的 Auto-Encoding Variational Bayes 之所以是 VAE 开山之作，不只是因为它写出了 ELBO。ELBO 在变分推断里早就存在。真正关键的是：他们把神经网络生成模型、摊销推断、重参数化技巧和随机梯度优化组合成一个可训练框架。</p>
+          <p>论文里常见几个术语，读的时候要对上。</p>
+          <ol>
+            <li><strong>recognition model。</strong>就是我们文章里说的 encoder 或 inference network，记作 \(q_\phi(z|x)\)。它负责从数据 \(x\) 近似推断潜变量 \(z\)。</li>
+            <li><strong>generative model。</strong>就是 decoder 加先验，联合分布为 \(p_\theta(x,z)=p(z)p_\theta(x|z)\)。</li>
+            <li><strong>SGVB estimator。</strong>Stochastic Gradient Variational Bayes estimator，指用重参数化和 Monte Carlo 样本估计 ELBO 梯度。</li>
+            <li><strong>AEVB algorithm。</strong>Auto-Encoding Variational Bayes algorithm，指把 SGVB estimator 放进自动编码器式的 encoder-decoder 结构里端到端训练。</li>
+          </ol>
+          <p>对单个样本 \(x^{(i)}\)，ELBO 是：</p>
+          <div class="equation">\[
+            \mathcal{L}(\theta,\phi;x^{(i)})
+            =
+            \mathbb{E}_{q_\phi(z|x^{(i)})}
+            [\log p_\theta(x^{(i)}|z)]
+            -
+            D_{\mathrm{KL}}
+            (q_\phi(z|x^{(i)})\|p(z)).
+          \]</div>
+          <p>用 \(L\) 个 Monte Carlo 样本估计重建期望，得到：</p>
+          <div class="equation">\[
+            \widetilde{\mathcal{L}}(\theta,\phi;x^{(i)})
+            =
+            \frac{1}{L}
+            \sum_{\ell=1}^{L}
+            \log p_\theta(x^{(i)}|z^{(i,\ell)})
+            -
+            D_{\mathrm{KL}}
+            (q_\phi(z|x^{(i)})\|p(z)),
+          \]</div>
+          <div class="equation">\[
+            z^{(i,\ell)}
+            =
+            \mu_\phi(x^{(i)})
+            +
+            \sigma_\phi(x^{(i)})\odot
+            \epsilon^{(\ell)},
+            \qquad
+            \epsilon^{(\ell)}\sim\mathcal{N}(0,I).
+          \]</div>
+          <p>在整个数据集上，目标是所有样本 ELBO 的和：</p>
+          <div class="equation">\[
+            \mathcal{L}(\theta,\phi;X)
+            =
+            \sum_{i=1}^{N}
+            \mathcal{L}(\theta,\phi;x^{(i)}).
+          \]</div>
+          <p>实际训练用 minibatch。若 minibatch 大小为 \(M\)，可以用：</p>
+          <div class="equation">\[
+            \mathcal{L}(\theta,\phi;X)
+            \approx
+            \frac{N}{M}
+            \sum_{i=1}^{M}
+            \widetilde{\mathcal{L}}(\theta,\phi;x^{(i)}).
+          \]</div>
+          <p>这就是 VAE 能在大数据和深度网络上训练的关键：不需要对每个数据点做昂贵的局部变分优化，也不需要精确计算边缘似然。每次只取一个 minibatch，用 encoder 给出 \(q_\phi(z|x)\)，重参数化采样 \(z\)，decoder 计算重建概率，再加上 KL 闭式项，就能用反向传播更新参数。</p>
+          <div class="insight-box">读开山论文时，可以把 AEVB 理解成一句话：用一个 recognition network 产生近似后验，用重参数化得到低方差梯度，用随机梯度最大化 ELBO。</div>
+        </section>
+
+        <section class="article-section">
+          <h2>9.6 为什么重参数化比普通梯度估计更关键？</h2>
+          <p>如果没有重参数化技巧，我们仍然可以用一种通用公式对期望求梯度。设：</p>
+          <div class="equation">\[
+            \mathcal{F}(\phi)
+            =
+            \mathbb{E}_{q_\phi(z|x)}[f(z)].
+          \]</div>
+          <p>score-function estimator 给出：</p>
+          <div class="equation">\[
+            \nabla_\phi \mathcal{F}(\phi)
+            =
+            \mathbb{E}_{q_\phi(z|x)}
+            \left[
+            f(z)\nabla_\phi\log q_\phi(z|x)
+            \right].
+          \]</div>
+          <p>这个公式很通用，离散变量也能用，但它通常方差很大。直觉上，它只根据“这次采到的 \(z\) 让 \(f(z)\) 大不大”来调整分布参数，随机性很强，需要很多样本才能稳定。</p>
+          <p>重参数化技巧走的是另一条路。把随机变量写成：</p>
+          <div class="equation">\[
+            z=g_\phi(\epsilon,x),
+            \qquad
+            \epsilon\sim p(\epsilon),
+          \]</div>
+          <p>其中 \(p(\epsilon)\) 不依赖 \(\phi\)。于是：</p>
+          <div class="equation">\[
+            \nabla_\phi
+            \mathbb{E}_{q_\phi(z|x)}[f(z)]
+            =
+            \nabla_\phi
+            \mathbb{E}_{p(\epsilon)}
+            [f(g_\phi(\epsilon,x))].
+          \]</div>
+          <p>因为 \(g_\phi\) 是可微函数，梯度可以沿着 \(f\) 对 \(z\) 的变化、再沿着 \(z\) 对 \(\phi\) 的变化传回来。这常被称为 pathwise gradient estimator。它利用了函数的局部导数信息，通常比 score-function estimator 方差更低。</p>
+          <p>这就是为什么 VAE 开山论文如此重要：它不是只说“我们有个下界”，而是给出了一个在深度网络里稳定优化这个下界的方法。没有这个低方差梯度估计，ELBO 可能只是漂亮公式；有了重参数化，它才变成可训练模型。</p>
+        </section>
+
+        <section class="article-section">
           <h2>10. 高斯 KL 的闭式公式</h2>
           <p>VAE 最常见设定是：</p>
           <div class="equation">\[
@@ -685,6 +782,9 @@ window.siteContent = {
             D_{\mathrm{KL}}(q_\phi(z|x)\|p(z)).
           \]</div>
           <p>当 \(\beta>1\) 时，模型更强调潜空间接近先验，可能得到更 disentangled 的表示，但重建质量可能下降。当 \(\beta<1\) 时，潜变量可以携带更多信息，重建可能更好，但潜空间可能不够规整。</p>
+          <p>这里的 disentanglement 指的是：潜变量的不同维度尽量对应数据变化中的不同因素。例如在理想情况下，一维控制旋转，一维控制粗细，一维控制位置。现实中这种对应不一定完美，也不一定自动出现，但 β-VAE 的动机就是通过更强的信息瓶颈，让模型倾向于学习更独立、更可解释的因素。</p>
+          <p>为什么更大的 \(\beta\) 可能帮助 disentanglement？一个直觉是：当瓶颈更窄时，模型不能随便把所有细节都塞进 \(z\)，只能保留对重建最有用、最稳定的变化因素。这样潜变量可能更有结构。但代价也明显：如果瓶颈太窄，细节丢失，重建和生成质量都会下降。</p>
+          <p>所以 β-VAE 不是“β 越大越好”。它是在三个目标之间权衡：重建质量、生成质量、表示可解释性。读相关论文或博客时，要警惕只看漂亮 traversal 图，而忽略 reconstruction 和 likelihood 变差。</p>
           <p><strong>IWAE</strong>，Importance Weighted Autoencoder，用多个 \(z\) 样本构造更紧的似然下界：</p>
           <div class="equation">\[
             \log p_\theta(x)
@@ -768,15 +868,17 @@ window.siteContent = {
 
           <h3>第三轮：训练和代码能否对应？</h3>
           <p><strong>检查七：你能否解释重参数化技巧为什么必要？</strong>它把 \(z\sim q_\phi(z|x)\) 改写成 \(z=\mu_\phi(x)+\sigma_\phi(x)\odot\epsilon\)，让随机性来自不依赖参数的 \(\epsilon\)，梯度可以穿过 \(\mu,\sigma\)。卡住时回到第 9 节。</p>
-          <p><strong>检查八：你能否解释 reconstruction loss 为什么有时是 BCE、有时是 MSE？</strong>它取决于 decoder likelihood。Bernoulli likelihood 对应 BCE，固定方差 Gaussian likelihood 对应 MSE。卡住时回到第 8 节。</p>
-          <p><strong>检查九：你能否把代码里的 KL 公式和数学 KL 对上？</strong>代码常用 \(-\frac{1}{2}\sum(1+\mathrm{logvar}-\mu^2-\exp(\mathrm{logvar}))\)，它就是高斯 KL 闭式的 log variance 写法。卡住时回到第 10 节和第 11 节。</p>
+          <p><strong>检查八：你能否解释开山论文里的 SGVB estimator 和 AEVB algorithm？</strong>SGVB 是重参数化后的随机梯度 ELBO 估计器，AEVB 是把这个估计器用于 recognition model 和 generative model 的端到端训练算法。卡住时回到第 9.5 节。</p>
+          <p><strong>检查九：你能否解释为什么 pathwise gradient 通常比 score-function estimator 更适合高斯 VAE？</strong>前者让梯度穿过可微采样路径，利用 \(f(z)\) 对 \(z\) 的局部导数；后者更通用但常常方差更大。卡住时回到第 9.6 节。</p>
+          <p><strong>检查十：你能否解释 reconstruction loss 为什么有时是 BCE、有时是 MSE？</strong>它取决于 decoder likelihood。Bernoulli likelihood 对应 BCE，固定方差 Gaussian likelihood 对应 MSE。卡住时回到第 8 节。</p>
+          <p><strong>检查十一：你能否把代码里的 KL 公式和数学 KL 对上？</strong>代码常用 \(-\frac{1}{2}\sum(1+\mathrm{logvar}-\mu^2-\exp(\mathrm{logvar}))\)，它就是高斯 KL 闭式的 log variance 写法。卡住时回到第 10 节和第 11 节。</p>
 
           <h3>第四轮：能不能读后续论文？</h3>
-          <p><strong>检查十：你能否解释 β-VAE 改了什么？</strong>它改变的是 KL 正则强度，也就是重建质量和潜空间规整之间的权衡。卡住时回到第 14 节。</p>
-          <p><strong>检查十一：你能否解释 IWAE 为什么是更紧下界？</strong>它用多个重要性样本估计边缘似然下界，\(K=1\) 时退化为普通 VAE。卡住时回到第 14 节。</p>
-          <p><strong>检查十二：你能否说明 VAE 和 Diffusion 的共同点与区别？</strong>共同点是都在最大化或近似最大化数据似然、学习生成分布；区别是 VAE 用潜变量积分和 ELBO，Diffusion 用逐步噪声路径和去噪目标。卡住时回到第 15 节。</p>
-          <p><strong>检查十三：你能否评价一个 VAE 是不是学好了？</strong>不能只看重建，也不能只看采样。应该同时看 ELBO、重建、随机采样、插值、latent traversal 和 KL 使用情况。卡住时回到第 12.5 节和第 15.5 节。</p>
-          <p>如果这十三个问题能顺畅回答，说明你已经不是在背 VAE 公式，而是真正理解了 VAE 为什么需要变分推断、为什么 ELBO 合理、为什么重参数化能训练、为什么 KL 会塑造潜空间。之后读 Kingma & Welling、Rezende、IWAE、β-VAE 或 Latent Diffusion 相关论文时，就能知道作者是在改先验、改后验族、改下界、改 decoder，还是改潜空间使用方式。</p>
+          <p><strong>检查十二：你能否解释 β-VAE 改了什么？</strong>它改变的是 KL 正则强度，也就是重建质量、潜空间规整和 disentanglement 之间的权衡。卡住时回到第 14 节。</p>
+          <p><strong>检查十三：你能否解释 IWAE 为什么是更紧下界？</strong>它用多个重要性样本估计边缘似然下界，\(K=1\) 时退化为普通 VAE。卡住时回到第 14 节。</p>
+          <p><strong>检查十四：你能否说明 VAE 和 Diffusion 的共同点与区别？</strong>共同点是都在最大化或近似最大化数据似然、学习生成分布；区别是 VAE 用潜变量积分和 ELBO，Diffusion 用逐步噪声路径和去噪目标。卡住时回到第 15 节。</p>
+          <p><strong>检查十五：你能否评价一个 VAE 是不是学好了？</strong>不能只看重建，也不能只看采样。应该同时看 ELBO、重建、随机采样、插值、latent traversal 和 KL 使用情况。卡住时回到第 12.5 节和第 15.5 节。</p>
+          <p>如果这十五个问题能顺畅回答，说明你已经不是在背 VAE 公式，而是真正理解了 VAE 为什么需要变分推断、为什么 ELBO 合理、为什么重参数化能训练、为什么 KL 会塑造潜空间。之后读 Kingma & Welling、Rezende、IWAE、β-VAE 或 Latent Diffusion 相关论文时，就能知道作者是在改先验、改后验族、改下界、改 decoder，还是改潜空间使用方式。</p>
         </section>
 
         <section class="article-section references">
