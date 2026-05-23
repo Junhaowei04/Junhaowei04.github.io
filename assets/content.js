@@ -1372,6 +1372,31 @@ window.siteContent = {
             <li>训练完成后，它如何从 \(p_\theta(x)\) 中采样？</li>
           </ol>
           <p>这三个问题能把大多数生成模型串起来。</p>
+
+          <figure class="source-figure">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/3/34/Three-generative-models.png" alt="自回归模型、VAE 和 GAN 的生成模型示意图" loading="lazy" />
+            <figcaption>参考图：三类经典生成模型的结构对比。读图时不要只看网络形状，而要问它们分别怎样表达分布、怎样训练、怎样采样。图片来源：Wikimedia Commons, Three-generative-models.png。</figcaption>
+          </figure>
+        </section>
+
+        <section class="article-section">
+          <h2>10.5 从这张地图走向开山论文</h2>
+          <p>如果只停留在“VAE、GAN、Flow、Diffusion 都是生成模型”这一层，还是会觉得这些名词有点散。更好的办法是把每类模型和它最早解决的问题对上。下面这张表不是为了背论文名，而是为了建立读论文时的坐标系：这篇论文究竟改变了 \(p_\theta(x)\) 的表达方式、训练目标，还是采样方式？</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>路线</th><th>代表性开端</th><th>它解决的核心问题</th><th>回到本文应该看哪里</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>潜变量模型 / VAE</td><td>Kingma & Welling, Auto-Encoding Variational Bayes；Rezende et al., Stochastic Backpropagation</td><td>边缘似然含有难积分的潜变量，怎么办？答案是用变分后验、ELBO 和重参数化，让神经网络潜变量生成模型可以端到端训练。</td><td>第 3 节、第 7 节、第 10 节。</td></tr>
+                <tr><td>GAN</td><td>Goodfellow et al., Generative Adversarial Nets</td><td>如果不显式写出可计算似然，能不能仍然让生成分布接近真实分布？GAN 用判别器给生成器提供分布差异信号。</td><td>第 4 节、第 8 节、第 10 节。</td></tr>
+                <tr><td>Normalizing Flow</td><td>Dinh et al., NICE；后续 Real NVP、Glow</td><td>能不能既容易采样，又能精确算密度？Flow 用可逆变换和变量替换公式，把简单分布变成复杂分布。</td><td>第 5 节、第 6 节、第 10 节。</td></tr>
+                <tr><td>Diffusion / Score</td><td>Ho et al., Denoising Diffusion Probabilistic Models；Song et al., Score-Based Generative Modeling through SDEs</td><td>复杂数据分布难以直接采样，能不能通过一条从数据到噪声、再从噪声回到数据的路径来学习？Diffusion 把分布拟合拆成许多噪声等级上的局部去噪问题。</td><td>第 2 节、第 4 节、第 7 节、第 10 节。</td></tr>
+                <tr><td>Flow Matching</td><td>Lipman et al., Flow Matching for Generative Modeling</td><td>能不能直接学习把简单分布运输到数据分布的速度场？Flow Matching 用连续性方程和 probability path，把生成看成概率质量的连续流动。</td><td>第 4 节、第 8 节、第 10 节。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>这样看，现代生成模型不是一堆孤立技巧，而是一组围绕同一目标的不同选择：有的选择显式密度，有的选择隐式分布匹配；有的引入潜变量，有的引入可逆变换，有的引入噪声路径或速度场。读论文时只要抓住“它在怎样让 \(p_\theta\) 接近 \(p_{\mathrm{data}}\)”这个问题，就不会被符号淹没。</p>
         </section>
 
         <section class="article-section">
@@ -1404,6 +1429,7 @@ window.siteContent = {
             <li>为什么最大似然估计可以看成分布拟合？</li>
             <li>负对数似然、交叉熵和 KL 散度之间是什么关系？</li>
             <li>为什么从身高这种一维生成模型到图像生成模型，困难主要来自高维和复杂依赖？</li>
+            <li>为什么 VAE、GAN、Flow、Diffusion 和 Flow Matching 都可以放在同一张“分布拟合”地图上？</li>
           </ol>
           <p>这些问题就是后续学习 Diffusion 的地基。Diffusion 的前向加噪、反向去噪、score、ELBO、Flow Matching 等概念，本质上都建立在“学习数据分布”这件事上。</p>
         </section>
@@ -1427,12 +1453,25 @@ window.siteContent = {
           <p><strong>问题八：为什么一个简单正态分布也算生成模型？</strong>因为它满足生成模型的定义：它对数据分布进行建模，并且可以从模型分布中采样新数据。不要把“生成模型”只理解成大型神经网络。正态分布模型、高斯混合模型、VAE、Flow、Diffusion 都在同一条线上，只是表达能力和训练方式不同。卡住时回到第 3 节、第 6 节和第 10 节。</p>
           <p><strong>问题九：如果模型分布接近真实分布，为什么单个生成样本仍可能不好？</strong>分布相近说的是整体统计规律，而不是每一次采样都完美。一个模型可能总体上覆盖了真实数据的主要模式，但某些采样点仍然落在低质量区域。评价生成模型时，不能只看一张图，也不能只看一个数字，而要同时看样本质量、多样性、分布覆盖和是否过拟合。卡住时回到第 8 节和第 9 节。</p>
           <p><strong>问题十：这篇文章和下一篇 Diffusion 有什么关系？</strong>Diffusion 也是生成模型，所以它仍然要学习 \(p_{\mathrm{data}}(x)\)。区别在于它不直接写出一个简单的 \(p_\theta(x)\)，而是构造一条从数据到噪声、再从噪声回到数据的路径。理解了本文的分布、似然、KL、采样之后，再看 Diffusion 的前向加噪、反向去噪、ELBO 和 score，就会知道它们不是孤立技巧，而是在服务同一个目标：让模型分布接近真实数据分布。卡住时回到第 10 节，然后进入下一篇。</p>
+
+          <h3>第四轮：能不能接上开山论文？</h3>
+          <p><strong>问题十一：为什么读 VAE、GAN、Flow、Diffusion 的开山论文之前，必须先懂“分布拟合”？</strong>因为这些论文表面上改的是网络结构或训练技巧，背后都在处理同一个问题：怎样表示、训练并采样一个接近真实数据分布的 \(p_\theta(x)\)。如果这个主线不清楚，ELBO、对抗损失、变量替换公式、去噪 MSE、速度场回归都会变成孤立公式。卡住时回到第 4 节、第 7 节和第 10.5 节。</p>
+          <p><strong>问题十二：为什么有些模型能算似然，有些模型不能精确算似然，却仍然都叫生成模型？</strong>生成模型的定义不是“必须能精确算 \(p_\theta(x)\)”，而是“能够刻画数据分布并从中生成样本”。Flow 和 autoregressive model 通常能精确或近似计算似然；VAE 用 ELBO 近似；GAN 常用隐式分布匹配；Diffusion 通过多步去噪和变分目标学习采样路径。卡住时回到第 8 节、第 10 节和第 10.5 节。</p>
         </section>
 
         <section class="article-section references">
           <h2>参考资料</h2>
           <ul>
             <li>斋藤康毅 著，郑明智 译，《深度学习入门5：生成模型》，人民邮电出版社，2025。本文主要参考步骤 1“正态分布”、步骤 2“最大似然估计”和步骤 5.1“KL 散度”；文中的总体/样本、参数估计、真实与生成分布、KL 硬币例子均为根据书中相关图意改写成文字说明。</li>
+            <li><a href="https://arxiv.org/abs/1312.6114" target="_blank" rel="noreferrer">Kingma and Welling, Auto-Encoding Variational Bayes, 2013</a></li>
+            <li><a href="https://arxiv.org/abs/1401.4082" target="_blank" rel="noreferrer">Rezende, Mohamed, Wierstra, Stochastic Backpropagation and Approximate Inference in Deep Generative Models, 2014</a></li>
+            <li><a href="https://arxiv.org/abs/1406.2661" target="_blank" rel="noreferrer">Goodfellow et al., Generative Adversarial Nets, 2014</a></li>
+            <li><a href="https://arxiv.org/abs/1410.8516" target="_blank" rel="noreferrer">Dinh, Krueger, Bengio, NICE: Non-linear Independent Components Estimation, 2014</a></li>
+            <li><a href="https://arxiv.org/abs/2006.11239" target="_blank" rel="noreferrer">Ho, Jain, Abbeel, Denoising Diffusion Probabilistic Models, 2020</a></li>
+            <li><a href="https://arxiv.org/abs/2011.13456" target="_blank" rel="noreferrer">Song et al., Score-Based Generative Modeling through Stochastic Differential Equations, 2020</a></li>
+            <li><a href="https://arxiv.org/abs/2210.02747" target="_blank" rel="noreferrer">Lipman et al., Flow Matching for Generative Modeling, 2022</a></li>
+            <li><a href="https://lilianweng.github.io/posts/2018-10-13-flow-models/" target="_blank" rel="noreferrer">Lilian Weng, Flow-based Deep Generative Models</a></li>
+            <li><a href="https://commons.wikimedia.org/wiki/File:Three-generative-models.png" target="_blank" rel="noreferrer">Wikimedia Commons, Three-generative-models.png</a></li>
           </ul>
         </section>
       `,
@@ -2156,6 +2195,16 @@ window.siteContent = {
           \]</div>
           <p>这和 denoising score matching 的味道很像：训练监督来自条件对象，但模型最终学到的是边缘对象。Diffusion 里是条件 score 到边缘 score；Flow Matching 里是条件速度到边缘速度。</p>
           <p>DiffusionFlow 的文章强调：在高斯源分布和合适 schedule 下，diffusion 与 flow matching 可以相互转换。它们常常不是“谁替代谁”的关系，而是同一类分布运输思想的不同参数化。</p>
+
+          <figure class="source-figure">
+            <img src="https://mlg.eng.cam.ac.uk/blog/assets/images/flow-matching/g2g-cond-paths-one-color.png" alt="Flow Matching 条件路径示意图" loading="lazy" />
+            <figcaption>参考图：Flow Matching 中从源分布到目标分布的条件路径。它帮助理解为什么训练时可以有条件速度监督，而生成时模型学到的是边缘速度场。图片来源：Cambridge MLG Blog, Flow Matching Guide and Code。</figcaption>
+          </figure>
+
+          <figure class="source-figure">
+            <img src="https://diffusionflow.github.io/assets/img/2025-04-28-distill-example/particle_movement.gif" alt="DiffusionFlow 粒子沿速度场移动示意动图" loading="lazy" />
+            <figcaption>参考动图：把样本看成粒子沿速度场从简单分布移动到数据分布，有助于把 Flow Matching 的 ODE 视角和 Diffusion 的分布运输视角连起来。图片来源：DiffusionFlow。</figcaption>
+          </figure>
 
           <h3>Flow Matching 和 Diffusion 的区别在哪里？</h3>
           <p>Diffusion 的经典训练目标经常从“加噪和去噪”出发，学习 score 或噪声；Flow Matching 则从“概率质量如何被速度场运输”出发，直接学习 ODE 速度。二者都可以从简单分布生成复杂分布，但思考入口不同。</p>
