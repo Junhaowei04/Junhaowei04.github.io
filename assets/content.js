@@ -3426,6 +3426,74 @@ window.siteContent = {
             <li>计算反向均值 \(\mu_\theta(x_t,t)\)。</li>
             <li>加入适当方差的高斯噪声，得到 \(x_{t-1}\)。</li>
           </ol>
+          <p>DDPM 原论文的 Algorithm 1 和 Algorithm 2 可以理解成同一套对象在两个阶段的不同用法。训练时我们人为合成 \(x_t\)，所以知道加入的真实噪声 \(\epsilon\)；采样时我们已经没有 \(x_0\) 和 \(\epsilon\)，只能让网络给出方向，再一步步从 \(x_T\) 走回 \(x_0\)。</p>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 520" role="img" aria-label="DDPM 训练算法和采样算法的对照流程图">
+              <defs>
+                <linearGradient id="ddpm-algo-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.74"></stop>
+                </linearGradient>
+                <marker id="ddpm-algo-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="420" fill="url(#ddpm-algo-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">DDPM Algorithm 1 / 2：训练和采样不是同一件事</text>
+              <text class="label-small" x="52" y="98">训练阶段用真实数据造监督信号；采样阶段只从噪声开始，反复使用同一个噪声预测网络。</text>
+
+              <text class="label label-blue" x="76" y="148">Algorithm 1：训练</text>
+              <rect x="70" y="176" width="142" height="66" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label-small" x="92" y="204">sample x0</text>
+              <text class="label-small" x="92" y="226">from dataset</text>
+              <path d="M 212 209 L 258 209" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#ddpm-algo-arrow)"></path>
+
+              <rect x="274" y="176" width="142" height="66" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label-small" x="294" y="204">sample t, eps</text>
+              <text class="label-small" x="294" y="226">eps is known</text>
+              <path d="M 416 209 L 462 209" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#ddpm-algo-arrow)"></path>
+
+              <rect x="478" y="176" width="154" height="66" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label-small" x="496" y="204">make noisy xt</text>
+              <text class="label-small" x="496" y="226">closed-form q</text>
+              <path d="M 632 209 L 678 209" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#ddpm-algo-arrow)"></path>
+
+              <rect x="694" y="176" width="174" height="66" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label-small" x="714" y="204">predict eps_theta</text>
+              <text class="label-small" x="714" y="226">MSE with true eps</text>
+
+              <path d="M 782 242 C 782 272, 612 278, 520 278" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#ddpm-algo-arrow)"></path>
+              <text class="label-small label-orange" x="534" y="292">update network parameters theta</text>
+
+              <line class="guide" x1="62" y1="314" x2="910" y2="314"></line>
+
+              <text class="label label-orange" x="76" y="354">Algorithm 2：采样</text>
+              <rect x="70" y="380" width="142" height="66" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label-small" x="92" y="408">start xT</text>
+              <text class="label-small" x="92" y="430">pure Gaussian</text>
+              <path d="M 212 413 L 258 413" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#ddpm-algo-arrow)"></path>
+
+              <rect x="274" y="380" width="142" height="66" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label-small" x="294" y="408">for t = T..1</text>
+              <text class="label-small" x="294" y="430">call eps_theta</text>
+              <path d="M 416 413 L 462 413" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#ddpm-algo-arrow)"></path>
+
+              <rect x="478" y="380" width="154" height="66" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label-small" x="496" y="408">compute mean</text>
+              <text class="label-small" x="496" y="430">mu_theta(xt,t)</text>
+              <path d="M 632 413 L 678 413" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#ddpm-algo-arrow)"></path>
+
+              <rect x="694" y="380" width="174" height="66" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label-small" x="714" y="408">sample xt-1</text>
+              <text class="label-small" x="714" y="430">repeat until x0</text>
+
+              <text class="label-small" x="76" y="284">关键：训练时有真实 eps，所以能把噪声预测变成监督学习。</text>
+              <text class="label-small" x="76" y="478">关键：采样时没有真实 eps，网络预测的方向被反复用于反向 Markov 链。</text>
+            </svg>
+            <figcaption>自绘图：DDPM 训练和采样使用同一个网络，但信息条件不同。训练时从真实 \(x_0\) 随机选 \(t\) 并采样真实噪声 \(\epsilon\)，所以可以合成 \(x_t\) 并用 MSE 监督 \(\epsilon_\theta\)。采样时只有 \(x_t\)，网络预测噪声后构造反向均值，再采样 \(x_{t-1}\)，循环直到得到 \(x_0\)。</figcaption>
+          </figure>
+
           <p>DDPM 的反向过程是随机的 Markov 链。DDIM 则构造了一个可以确定性采样的路径。它保持相同的边缘 \(q(x_t|x_0)\)，但不要求反向过程必须是原来的随机 Markov 链。当 \(\eta=0\) 时，DDIM 采样是确定性的；同一个初始噪声会得到一致的生成结果。这也解释了为什么 DDIM 可以用于 latent interpolation。</p>
           <p>DDIM 的一步更新常写成下面的形式。先由网络得到：</p>
           <div class="equation">\[
@@ -3766,6 +3834,7 @@ window.siteContent = {
           <h3>第二轮：核心推导能不能自己走完？</h3>
           <p><strong>检查四：你能否解释为什么 \(q(x_{t-1}|x_t,x_0)\) 是高斯？</strong>回答时应该说出贝叶斯公式、Markov 性、两个高斯密度相乘、二次型配方、精度相加。这里是读 DDPM 论文最关键的门槛。卡住时回到第 6 节。</p>
           <p><strong>检查五：你能否解释为什么预测噪声可以训练生成模型？</strong>回答时不能只说“DDPM 就是这么做的”，而要说清楚：预测噪声可以反推出 \(\hat{x}_0\)，进而参数化反向均值；反向高斯 KL 在方差固定时变成均值 MSE；均值 MSE 又可以写成噪声 MSE。卡住时回到第 7 节和第 9 节。</p>
+          <p><strong>检查五（补充）：你能否把 DDPM 原论文 Algorithm 1 和 Algorithm 2 讲成代码流程？</strong>训练算法要说清楚 \(x_0,t,\epsilon,x_t\) 从哪里来，以及为什么有真实 \(\epsilon\) 可以监督；采样算法要说清楚为什么从 \(x_T\sim\mathcal{N}(0,I)\) 开始，怎样反复调用 \(\epsilon_\theta(x_t,t)\) 得到 \(x_{t-1}\)。卡住时回到第 7.5 节和第 10 节。</p>
           <p><strong>检查六：你能否把 score 和噪声预测联系起来？</strong>应该能写出：</p>
           <div class="equation">\[
             \nabla_{x_t}\log q(x_t|x_0)
