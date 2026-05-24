@@ -276,6 +276,69 @@ window.siteContent = {
         </section>
 
         <section class="article-section">
+          <h2>4.5 Goodfellow 开山论文的理论闭环</h2>
+          <p>把前面几节合起来，原始 GAN 论文的核心定理其实是一条很短但很重要的链。它不是只提出“两个网络对抗”这个故事，而是证明：在理想条件下，这个对抗游戏确实对应一个明确的分布距离，并且全局最优点就是生成分布等于真实分布。</p>
+          <ol>
+            <li>固定生成器 \(G\) 时，判别器有解析最优解 \(D_G^*(x)=p_{\mathrm{data}}(x)/(p_{\mathrm{data}}(x)+p_g(x))\)。</li>
+            <li>把 \(D_G^*\) 代回目标，得到 \(V(D_G^*,G)=-\log4+2D_{\mathrm{JS}}(p_{\mathrm{data}}\|p_g)\)。</li>
+            <li>因为 JS 散度非负，并且当且仅当两个分布相同才为 0，所以全局最小值是 \(-\log4\)，此时 \(p_g=p_{\mathrm{data}}\)。</li>
+            <li>在这个点上，最优判别器处处给出 \(1/2\)，也就是它无法区分真实样本和生成样本。</li>
+          </ol>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 500" role="img" aria-label="原始 GAN 开山论文从 minimax 目标到全局最优的理论闭环图">
+              <defs>
+                <linearGradient id="gan-proof-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.74"></stop>
+                </linearGradient>
+                <marker id="gan-proof-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="398" fill="url(#gan-proof-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">原始 GAN 的理论闭环</text>
+              <text class="label-small" x="52" y="98">Goodfellow 论文的核心不是只讲“对抗”，而是把对抗目标化成一个明确的分布距离。</text>
+
+              <rect x="68" y="150" width="164" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="96" y="180">minimax</text>
+              <text class="label-small" x="88" y="204">min_G max_D V(D,G)</text>
+              <path d="M 232 188 L 288 188" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-proof-arrow)"></path>
+
+              <rect x="304" y="150" width="178" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="332" y="180">固定 G</text>
+              <text class="label-small" x="326" y="204">求出最优 D*</text>
+              <path d="M 482 188 L 538 188" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-proof-arrow)"></path>
+
+              <rect x="554" y="150" width="178" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="584" y="180">代回目标</text>
+              <text class="label-small" x="574" y="204">-log4 + 2 JS</text>
+              <path d="M 732 188 L 788 188" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-proof-arrow)"></path>
+
+              <rect x="804" y="150" width="112" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="830" y="180">最小 JS</text>
+              <text class="label-small" x="822" y="204">分布相同</text>
+
+              <path d="M 860 226 C 860 278, 746 298, 660 314" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-proof-arrow)"></path>
+              <rect x="472" y="298" width="260" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="510" y="328">p_g = p_data</text>
+              <text class="label-small" x="500" y="352">全局最优值是 -log 4</text>
+              <path d="M 472 336 L 372 336" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-proof-arrow)"></path>
+
+              <rect x="168" y="298" width="188" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="196" y="328">D*(x)=1/2</text>
+              <text class="label-small" x="190" y="352">判别器只能乱猜</text>
+
+              <text class="label-small label-blue" x="92" y="414">理论结论：理想 GAN 的均衡点确实是学到真实分布。</text>
+              <text class="label-small label-orange" x="530" y="414">实践难点：训练中 D 不会总是最优，JS 也可能饱和。</text>
+            </svg>
+            <figcaption>自绘图：原始 GAN 的理论保证可以读成一条闭环。先固定生成器求最优判别器，再把它代回 minimax 目标，目标就变成 JS 散度加常数。由于 JS 散度在两个分布相同时取 0，理想全局最优就是 \(p_g=p_{\mathrm{data}}\)，此时 \(D_G^*(x)=1/2\)。</figcaption>
+          </figure>
+
+          <p>这个闭环也解释了为什么后续章节要讲训练困难。理论结论依赖几个理想化条件：判别器有足够容量、每次都能接近最优、生成器优化能沿着合适方向前进。真实神经网络训练里，这些条件都不完全成立，所以才会出现梯度饱和、模式崩溃、训练震荡，并催生 WGAN、WGAN-GP、谱归一化、hinge loss 等后续工作。</p>
+        </section>
+
+        <section class="article-section">
           <h2>5. JS 散度结论为什么既漂亮又危险？</h2>
           <p>从理论上看，上一节的结论非常漂亮：GAN 有明确的分布匹配目标，最优点是 \(p_g=p_{\mathrm{data}}\)。但实际训练 GAN 时，很多困难也从这里出现。</p>
           <p>第一个问题是：判别器不可能每一步都真正达到最优。训练中我们只是在有限 minibatch 上做几步梯度更新，所以 \(D\) 和 \(G\) 总是在相互追逐。这个动态不是普通的单目标优化，而是一个博弈问题。</p>
@@ -751,7 +814,8 @@ window.siteContent = {
           <h3>第二轮：核心推导有没有过关？</h3>
           <p><strong>检查四：你能否独立推导最优判别器？</strong>应该能从 \(a\log y+b\log(1-y)\) 求导，得到 \(D_G^*(x)=p_{\mathrm{data}}(x)/(p_{\mathrm{data}}(x)+p_g(x))\)。卡住时回到第 3 节。</p>
           <p><strong>检查五：你能否解释 JS 散度从哪里来？</strong>应该能把 \(D_G^*\) 代回目标，引入 \(m=(p_{\mathrm{data}}+p_g)/2\)，再整理成 \(-\log4+2D_{\mathrm{JS}}\)。卡住时回到第 4 节。</p>
-          <p><strong>检查六：你能否解释为什么 \(D=1/2\) 是理想状态？</strong>因为当 \(p_g=p_{\mathrm{data}}\) 时，最优判别器无法区分真假样本，只能给出 \(1/2\)。卡住时回到第 3 节。</p>
+          <p><strong>检查六：你能否复述 Goodfellow 原论文的理论闭环？</strong>应该能说出：固定 \(G\) 有最优 \(D^*\)，代回得到 \(-\log4+2D_{\mathrm{JS}}\)，JS 的全局最小点是 \(p_g=p_{\mathrm{data}}\)，此时 \(D^*(x)=1/2\)。卡住时回到第 3 节、第 4 节和第 4.5 节。</p>
+          <p><strong>检查六（补充）：你能否解释为什么 \(D=1/2\) 是理想状态？</strong>因为当 \(p_g=p_{\mathrm{data}}\) 时，最优判别器无法区分真假样本，只能给出 \(1/2\)。卡住时回到第 3 节和第 4.5 节。</p>
           <h3>第三轮：训练问题有没有理解？</h3>
           <p><strong>检查七：你能否解释非饱和损失为什么常用？</strong>它和 minimax 有相同理想目标，但在训练早期能给生成器更强梯度。卡住时回到第 6 节。</p>
           <p><strong>检查八：你能否解释模式崩溃？</strong>它不是单张图不好，而是生成分布没有覆盖真实分布的多个模式。卡住时回到第 9 节和第 15 节。</p>
@@ -762,7 +826,7 @@ window.siteContent = {
           <p><strong>检查十二：你能否说明 WGAN 为什么不用 sigmoid 判别器？</strong>WGAN 的 critic 不是输出真假概率，而是近似 Kantorovich-Rubinstein dual 中的 1-Lipschitz 函数。卡住时回到第 12 节。</p>
           <p><strong>检查十三：你能否解释 WGAN-GP 的梯度惩罚在约束什么？</strong>它约束 critic 对输入的梯度范数，帮助满足 Lipschitz 条件。卡住时回到第 13 节。</p>
           <p><strong>检查十四：你能否解释 spectral normalization、feature matching 和 TTUR 分别在修什么？</strong>spectral normalization 约束判别器平滑性，feature matching 改生成器训练信号，TTUR 调整双网络学习速度。卡住时回到第 13.5 节。</p>
-          <p>如果这十四个问题都能顺畅回答，说明你已经掌握 GAN 的核心理论：它如何把分布比较变成二分类博弈，为什么最优判别器导向 JS 散度，为什么实际训练要改损失和架构，以及 WGAN 为什么要换成 Wasserstein 距离。之后读 GAN、DCGAN、LSGAN、WGAN、WGAN-GP、Pix2Pix、CycleGAN、StyleGAN 等论文时，就能知道每篇是在改目标、改距离、改约束、改架构，还是改条件建模方式。</p>
+          <p>如果这些问题都能顺畅回答，说明你已经掌握 GAN 的核心理论：它如何把分布比较变成二分类博弈，为什么最优判别器导向 JS 散度，为什么理想全局最优是 \(p_g=p_{\mathrm{data}}\)，为什么实际训练要改损失和架构，以及 WGAN 为什么要换成 Wasserstein 距离。之后读 GAN、DCGAN、LSGAN、WGAN、WGAN-GP、Pix2Pix、CycleGAN、StyleGAN 等论文时，就能知道每篇是在改目标、改距离、改约束、改架构，还是改条件建模方式。</p>
         </section>
 
         <section class="article-section references">
