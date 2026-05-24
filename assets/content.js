@@ -3410,6 +3410,62 @@ window.siteContent = {
           <p>这和 denoising score matching 的味道很像：训练监督来自条件对象，但模型最终学到的是边缘对象。Diffusion 里是条件 score 到边缘 score；Flow Matching 里是条件速度到边缘速度。</p>
           <p>DiffusionFlow 的文章强调：在高斯源分布和合适 schedule 下，diffusion 与 flow matching 可以相互转换。它们常常不是“谁替代谁”的关系，而是同一类分布运输思想的不同参数化。</p>
 
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 520" role="img" aria-label="Flow Matching 中条件路径速度如何平均成边缘速度场的机制图">
+              <defs>
+                <linearGradient id="fm-conditional-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.74"></stop>
+                </linearGradient>
+                <marker id="fm-conditional-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="420" fill="url(#fm-conditional-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">Conditional Flow Matching 的关键平均</text>
+              <text class="label-small" x="52" y="98">训练时知道一条具体条件路径的速度；生成时只看到当前位置，所以模型要学的是所有可能条件速度的条件平均。</text>
+
+              <line class="axis" x1="78" y1="346" x2="428" y2="346"></line>
+              <line class="axis" x1="78" y1="346" x2="78" y2="136"></line>
+              <circle class="dot-model" cx="122" cy="308" r="7"></circle>
+              <circle class="dot-model" cx="156" cy="246" r="7"></circle>
+              <circle class="dot-model" cx="202" cy="288" r="7"></circle>
+              <circle class="dot-real" cx="350" cy="188" r="7"></circle>
+              <circle class="dot-real" cx="388" cy="252" r="7"></circle>
+              <circle class="dot-real" cx="332" cy="306" r="7"></circle>
+              <path class="curve-soft" d="M 122 308 C 190 258, 260 218, 350 188"></path>
+              <path class="curve-soft" d="M 156 246 C 220 246, 306 246, 388 252"></path>
+              <path class="curve-soft" d="M 202 288 C 246 302, 286 310, 332 306"></path>
+              <path d="M 238 248 L 292 220" fill="none" stroke="#5d6b7a" stroke-width="2" marker-end="url(#fm-conditional-arrow)"></path>
+              <path d="M 258 248 L 318 250" fill="none" stroke="#5d6b7a" stroke-width="2" marker-end="url(#fm-conditional-arrow)"></path>
+              <path d="M 252 300 L 296 306" fill="none" stroke="#5d6b7a" stroke-width="2" marker-end="url(#fm-conditional-arrow)"></path>
+              <text class="label-small label-orange" x="104" y="374">source noise x0</text>
+              <text class="label-small label-blue" x="300" y="374">data x1</text>
+              <text class="label-small" x="96" y="124">条件路径：给定配对 z=(x0,x1)</text>
+
+              <path d="M 442 244 L 510 244" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#fm-conditional-arrow)"></path>
+              <text class="label-small" x="444" y="226">在同一个 x_t 附近</text>
+              <text class="label-small" x="444" y="282">收集可能速度</text>
+
+              <line class="axis" x1="542" y1="346" x2="900" y2="346"></line>
+              <line class="axis" x1="542" y1="346" x2="542" y2="136"></line>
+              <circle class="dot-model" cx="690" cy="256" r="8"></circle>
+              <path d="M 690 256 L 746 218" fill="none" stroke="#b8c5d1" stroke-width="2.2" marker-end="url(#fm-conditional-arrow)"></path>
+              <path d="M 690 256 L 760 260" fill="none" stroke="#b8c5d1" stroke-width="2.2" marker-end="url(#fm-conditional-arrow)"></path>
+              <path d="M 690 256 L 730 308" fill="none" stroke="#b8c5d1" stroke-width="2.2" marker-end="url(#fm-conditional-arrow)"></path>
+              <path d="M 690 256 L 778 250" fill="none" stroke="#4fb3f6" stroke-width="4" marker-end="url(#fm-conditional-arrow)"></path>
+              <text class="label" x="600" y="166">v_t(x)</text>
+              <text class="label-small" x="600" y="194">= E[u_t(x|z) | x_t=x]</text>
+              <text class="label-small" x="600" y="376">边缘速度场：模型生成时真正使用的方向</text>
+              <text class="label-small label-orange" x="748" y="220">多个条件速度</text>
+              <text class="label-small label-blue" x="782" y="252">平均方向</text>
+
+              <text class="label-small" x="88" y="418">训练 loss：让 v_theta(x_t,t) 匹配可构造的 u_t(x|z)</text>
+              <text class="label-small" x="556" y="418">生成 ODE：dx/dt = v_theta(x,t)，不再知道 z</text>
+            </svg>
+            <figcaption>自绘图：Conditional Flow Matching 的监督信号来自条件路径 \(p_t(x|z)\)。每条路径都有可写出的条件速度 \(u_t(x|z)\)，但生成时样本只知道自己在 \(x_t=x\)，不知道来自哪条路径。因此网络回归条件速度的平方损失，最终学到的是这些条件速度在当前位置下的平均，也就是边缘速度场 \(v_t(x)\)。</figcaption>
+          </figure>
+
           <figure class="source-figure">
             <img src="https://mlg.eng.cam.ac.uk/blog/assets/images/flow-matching/g2g-cond-paths-one-color.png" alt="Flow Matching 条件路径示意图" loading="lazy" />
             <figcaption>参考图：Flow Matching 中从源分布到目标分布的条件路径。它帮助理解为什么训练时可以有条件速度监督，而生成时模型学到的是边缘速度场。图片来源：Cambridge MLG Blog, Flow Matching Guide and Code。</figcaption>
@@ -3603,7 +3659,7 @@ window.siteContent = {
           <p>并且能解释这只是条件 score，真正生成需要边缘 score，而 denoising score matching 正是用条件监督学习边缘方向。卡住时回到第 8 节。</p>
 
           <h3>第三轮：能不能带着框架读新论文？</h3>
-          <p><strong>检查七：你能否解释 SDE、ODE、Flow Matching 的共同点？</strong>它们都在描述概率分布如何从噪声端移动到数据端。SDE 用随机过程和 score 修正反向漂移，probability flow ODE 用确定性速度保持同样边缘分布，Flow Matching 直接回归满足连续性方程的速度场。卡住时回到第 11 节和第 12 节。</p>
+          <p><strong>检查七：你能否解释 SDE、ODE、Flow Matching 的共同点？</strong>它们都在描述概率分布如何从噪声端移动到数据端。SDE 用随机过程和 score 修正反向漂移，probability flow ODE 用确定性速度保持同样边缘分布，Flow Matching 直接回归满足连续性方程的速度场。进一步地，你还应该能说清楚 conditional velocity 为什么可以训练 marginal velocity：训练时知道条件路径，生成时只用当前位置下的平均速度。卡住时回到第 11 节和第 12 节。</p>
           <p><strong>检查八：你能否看到一篇新论文时，立刻定位它改变的是哪一层？</strong>有些论文改变噪声 schedule，有些改变网络输出参数化，有些改变采样器，有些把像素空间换成 latent space，有些把 score 语言换成 flow 语言。只要能把创新点放回“路径、目标、参数化、采样”这四个位置，就不会被新名词牵着走。卡住时回到第 14 节、第 15 节和第 17 节。</p>
           <p><strong>检查九：你能否把公式翻译成口头解释？</strong>比如 \(\bar{\alpha}_t\) 不是一个神秘符号，而是原始信号保留比例；\(\tilde{\mu}_t\) 不是凭空出现的均值，而是由 \(x_t\) 和 \(x_0\) 两个信息源按可靠性加权；score 不是抽象梯度，而是往高概率区域移动的方向。能做到这一点，说明公式已经变成理解，而不是记忆负担。卡住时回到第 4.5 节、第 6 节和第 8 节。</p>
           <p><strong>检查十：你能否解释为什么采样慢、为什么可以加速？</strong>慢是因为模型沿着很多离散噪声等级逐步移动，每一步只做局部修正；加速则来自更好的时间步选择、更稳定的 ODE/SDE 求解器、或者更直接的路径学习。这样看 DDIM、DPM-Solver、EDM、consistency model 时，就能明白它们大多是在改进“怎么走这条路”。卡住时回到第 10 节、第 11 节和第 12 节。</p>
