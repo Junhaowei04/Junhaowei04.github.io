@@ -2228,6 +2228,55 @@ window.siteContent = {
           \]</div>
           <p>右边就是平均对数似然。于是我们得到一个非常重要的结论：</p>
           <div class="insight-box">在样本足够多时，最大化训练数据的对数似然，可以理解为最小化真实数据分布和模型分布之间的 KL 散度。</div>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="最大似然用有限样本近似真实分布下的期望，从而推动模型分布接近真实分布">
+              <defs>
+                <linearGradient id="mle-kl-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="mle-kl-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="338" fill="url(#mle-kl-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="68">为什么最大似然是在拟合分布？</text>
+              <text class="label-small" x="52" y="94">训练集是从真实分布抽到的有限样本；最大化这些样本的 log likelihood，会把模型概率质量推向真实高密度区域。</text>
+
+              <line class="axis" x1="70" y1="294" x2="310" y2="294"></line>
+              <line class="axis" x1="70" y1="294" x2="70" y2="132"></line>
+              <path class="curve-real" d="M 82 286 C 120 276, 130 172, 180 150 C 232 126, 250 260, 302 270"></path>
+              <circle class="dot-real" cx="132" cy="294" r="4"></circle>
+              <circle class="dot-real" cx="154" cy="294" r="4"></circle>
+              <circle class="dot-real" cx="176" cy="294" r="4"></circle>
+              <circle class="dot-real" cx="203" cy="294" r="4"></circle>
+              <circle class="dot-real" cx="238" cy="294" r="4"></circle>
+              <text class="label-small label-blue" x="98" y="136">真实分布 pdata</text>
+              <text class="label-small" x="112" y="324">有限训练样本</text>
+
+              <path d="M 326 212 L 408 212" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#mle-kl-arrow)"></path>
+              <text class="label-small" x="326" y="188">用样本平均近似期望</text>
+
+              <line class="axis" x1="430" y1="294" x2="670" y2="294"></line>
+              <line class="axis" x1="430" y1="294" x2="430" y2="132"></line>
+              <path class="curve-real" d="M 442 286 C 480 276, 490 172, 540 150 C 592 126, 610 260, 662 270"></path>
+              <path class="curve-model" d="M 442 288 C 488 282, 508 252, 550 238 C 594 224, 624 154, 662 160"></path>
+              <path d="M 562 236 C 574 218, 590 190, 616 166" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#mle-kl-arrow)"></path>
+              <text class="label-small label-orange" x="520" y="224">调整 pθ</text>
+              <text class="label-small" x="462" y="324">提高训练样本的 log pθ(x)</text>
+
+              <rect x="724" y="122" width="184" height="184" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="756" y="158">同一个目标</text>
+              <text class="label-small" x="748" y="194">最大化似然</text>
+              <path d="M 756 208 L 876 208" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#mle-kl-arrow)"></path>
+              <text class="label-small" x="748" y="238">最小化交叉熵</text>
+              <path d="M 756 252 L 876 252" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#mle-kl-arrow)"></path>
+              <text class="label-small" x="748" y="282">最小化 KL</text>
+            </svg>
+            <figcaption>自绘图：真实分布不可见，训练集给了我们一批样本。最大似然让模型提高这些样本附近的概率密度；当样本足够多时，这等价于用样本平均近似 \(\mathbb{E}_{p_{\mathrm{data}}}[\log p_\theta(x)]\)，也就是在最小化 \(D_{\mathrm{KL}}(p_{\mathrm{data}}\|p_\theta)\) 中真正依赖模型的部分。</figcaption>
+          </figure>
+
           <p>这就是“为什么最大似然是在拟合分布”的理论连接。书中步骤 5.1.3 也强调了这一点：最大似然估计可以从最小化 KL 散度的角度得到。</p>
           <p>所以，当我们训练生成模型时，最大似然不是单纯让训练样本概率变大，它背后的目标是让模型分布更接近真实分布。训练集只是我们接触真实分布的方式。</p>
         </section>
@@ -2263,6 +2312,7 @@ window.siteContent = {
           \]</div>
           <p>因此，最小化负对数似然、最小化交叉熵、最小化 \(D_{\mathrm{KL}}(p_{\mathrm{data}}\|p_\theta)\)，在这里本质上是在做同一件事：让模型给真实数据常出现的区域更高概率。</p>
           <p>这个连接非常重要，因为后面很多生成模型会把目标包装成不同形式。VAE 里会出现 ELBO，Diffusion 里会出现变分下界和噪声 MSE，语言模型里会出现 token-level cross entropy。表面上 loss 不同，底层问题仍然是：模型分布是否更接近真实数据分布。</p>
+          <div class="paper-note">读生成模型开山论文时，先不要急着背新 loss。先问它和这里的分布拟合主线是什么关系：VAE 是把难算的 \(\log p_\theta(x)\) 换成 ELBO 下界；GAN 是没有显式似然时用判别器比较 \(p_{\mathrm{data}}\) 和 \(p_g\)；Diffusion 是把高维分布匹配拆成噪声等级上的条件去噪。这样看，新公式不是孤立技巧，而是在绕开“直接算真实分布和模型分布差异很难”这个核心困难。</div>
         </section>
 
         <section class="article-section">
