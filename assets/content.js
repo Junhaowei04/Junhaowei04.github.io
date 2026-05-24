@@ -3137,6 +3137,64 @@ window.siteContent = {
             \right].
           \]</div>
           <p>初学者读论文时最容易卡在这里：为什么突然从 likelihood 变成预测噪声？中间桥梁就是：likelihood 下界 → 反向高斯 KL → 均值匹配 → 用 \(\epsilon_\theta\) 参数化均值 → MSE。</p>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="DDPM 训练目标从最大似然到噪声预测均方误差的推导路线图">
+              <defs>
+                <linearGradient id="ddpm-loss-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="ddpm-loss-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="338" fill="url(#ddpm-loss-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="68">DDPM 为什么最后训练一个噪声 MSE？</text>
+              <text class="label-small" x="52" y="94">代码里的一行 MSE 背后，是最大似然、变分下界、反向高斯 KL 和均值参数化串起来的结果。</text>
+
+              <rect x="58" y="136" width="142" height="72" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="82" y="166">最大似然</text>
+              <text class="label-small" x="76" y="190">max log pθ(x0)</text>
+              <path d="M 200 172 L 254 172" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#ddpm-loss-arrow)"></path>
+
+              <rect x="268" y="136" width="142" height="72" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="294" y="166">引入前向 q</text>
+              <text class="label-small" x="284" y="190">已知加噪链</text>
+              <path d="M 410 172 L 464 172" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#ddpm-loss-arrow)"></path>
+
+              <rect x="478" y="136" width="142" height="72" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="512" y="166">ELBO / VLB</text>
+              <text class="label-small" x="498" y="190">可分解的下界</text>
+              <path d="M 620 172 L 674 172" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#ddpm-loss-arrow)"></path>
+
+              <rect x="688" y="136" width="210" height="72" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="732" y="166">中间 KL 项</text>
+              <text class="label-small" x="708" y="190">q(x_{t-1}|xt,x0) 对齐 pθ(x_{t-1}|xt)</text>
+
+              <path d="M 792 208 C 792 236, 744 246, 744 274" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#ddpm-loss-arrow)"></path>
+
+              <rect x="620" y="274" width="176" height="72" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="650" y="304">高斯 KL</text>
+              <text class="label-small" x="640" y="328">约化成均值 MSE</text>
+              <path d="M 620 310 L 556 310" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#ddpm-loss-arrow)"></path>
+
+              <rect x="366" y="274" width="176" height="72" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="392" y="304">预测 ε</text>
+              <text class="label-small" x="386" y="328">由 εθ 反推出 x0 和 μθ</text>
+              <path d="M 366 310 L 302 310" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#ddpm-loss-arrow)"></path>
+
+              <rect x="92" y="274" width="196" height="72" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="126" y="304">L_simple</text>
+              <text class="label-small" x="112" y="328">E || ε - εθ(xt,t) ||²</text>
+
+              <text class="label-small label-blue" x="78" y="244">概率建模目标</text>
+              <text class="label-small label-orange" x="614" y="244">可训练监督信号</text>
+              <path class="curve-soft" d="M 132 238 C 300 232, 478 232, 744 238"></path>
+            </svg>
+            <figcaption>自绘图：DDPM 的训练目标不是凭空变成 MSE。最大似然因为隐变量链难算，所以引入前向过程 \(q\) 得到 ELBO；ELBO 的中间项要求模型反向高斯接近真实后验高斯；方差固定时，高斯 KL 变成均值匹配；再用 \(\epsilon_\theta\) 参数化均值，最终得到噪声预测 MSE。</figcaption>
+          </figure>
+
           <div class="paper-note">如果你想读 DDPM 原论文，可以先把所有 \(L_T,L_{t-1},L_0\) 都标出来，再逐个问：这一项有没有参数？它要求哪个分布接近哪个分布？它最后会不会变成一个可训练的 MSE？这样论文里的推导会清楚很多。</div>
         </section>
 
