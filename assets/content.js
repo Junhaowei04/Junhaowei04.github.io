@@ -147,6 +147,43 @@ window.siteContent = {
           \]</div>
           <p>这个公式非常重要。它说明判别器不是在学一个神秘的“真假审美”，而是在估计两个分布在每个位置的相对大小。如果某个 \(x\) 附近真实数据密度远大于生成密度，最优判别器接近 1；如果生成密度远大于真实密度，最优判别器接近 0；如果两者一样大，最优判别器就是 \(1/2\)。</p>
           <div class="insight-box">当 \(p_g=p_{\mathrm{data}}\) 时，最优判别器处处是 \(D_G^*(x)=1/2\)。这就是“判别器只能乱猜”的数学含义。</div>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 410" role="img" aria-label="GAN 最优判别器把真实分布和生成分布的局部密度比转成真假概率">
+              <defs>
+                <linearGradient id="gan-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="gan-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="320" fill="url(#gan-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="68">最优判别器不是“审美打分”，而是局部密度比</text>
+              <text class="label-small" x="52" y="94">同一个位置 x 上，比较真实密度 p_data(x) 和生成密度 p_g(x)</text>
+
+              <line class="axis" x1="72" y1="280" x2="450" y2="280"></line>
+              <line class="axis" x1="72" y1="280" x2="72" y2="122"></line>
+              <path class="curve-real" d="M 82 272 C 118 260, 134 165, 184 142 C 236 118, 258 254, 316 258 C 360 260, 378 182, 442 176"></path>
+              <path class="curve-model" d="M 82 276 C 130 270, 154 238, 210 230 C 260 222, 292 150, 342 142 C 386 136, 410 220, 442 250"></path>
+              <text class="label-small label-blue" x="102" y="134">p_data(x)</text>
+              <text class="label-small label-orange" x="330" y="132">p_g(x)</text>
+              <line class="guide" x1="184" y1="142" x2="184" y2="280"></line>
+              <line class="guide" x1="342" y1="142" x2="342" y2="280"></line>
+              <text class="label-small" x="150" y="306">真实更密</text>
+              <text class="label-small" x="308" y="306">生成更密</text>
+
+              <path d="M 476 202 L 558 202" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-arrow)"></path>
+              <rect x="584" y="116" width="330" height="176" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="612" y="152">D*(x) = p_data(x) / (p_data(x)+p_g(x))</text>
+              <text class="label-small" x="612" y="184">真实密度大：D*(x) 接近 1，判为真实</text>
+              <text class="label-small" x="612" y="214">生成密度大：D*(x) 接近 0，判为生成</text>
+              <text class="label-small" x="612" y="244">二者相等：D*(x)=0.5，判别器只能猜</text>
+              <path class="curve-soft" d="M 612 270 C 680 232, 730 232, 804 270 C 842 290, 882 286, 904 264"></path>
+            </svg>
+            <figcaption>自绘图：GAN 的判别器可以看成一个“密度比估计器”。当生成器改进时，它不是在追求某张图骗过人，而是在把 \(p_g\) 推向 \(p_{\mathrm{data}}\)，让最优判别器越来越难区分两类样本。</figcaption>
+          </figure>
         </section>
 
         <section class="article-section">
@@ -785,6 +822,63 @@ window.siteContent = {
             \int p_\theta(x|z)p(z)\,dz.
           \]</div>
           <p>这条公式是 VAE 的核心。它说：一个样本 \(x\) 的概率，不是由某一个潜变量决定的，而是所有潜变量路径共同贡献的总概率。每个 \(z\) 先按先验 \(p(z)\) 出现，再按 \(p_\theta(x|z)\) 生成 \(x\)。把这些可能性加起来，就是 \(p_\theta(x)\)。</p>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="VAE 中先验、encoder、decoder 和 ELBO 的关系示意图">
+              <defs>
+                <linearGradient id="vae-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="vae-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="338" fill="url(#vae-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="68">VAE 的两条路径：生成路径与推断路径</text>
+              <text class="label-small" x="52" y="94">生成时从 z 到 x；训练时从 x 反推哪些 z 可能解释它，并用 ELBO 把两件事合在一起。</text>
+
+              <rect x="72" y="138" width="148" height="72" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="106" y="168">先验 p(z)</text>
+              <text class="label-small" x="103" y="192">标准高斯</text>
+              <path d="M 220 174 L 312 174" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-arrow)"></path>
+              <rect x="324" y="120" width="172" height="108" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="366" y="154">decoder</text>
+              <text class="label-small" x="350" y="182">pθ(x|z)</text>
+              <text class="label-small" x="350" y="204">把潜变量译成数据分布</text>
+              <path d="M 496 174 L 594 174" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-arrow)"></path>
+              <rect x="606" y="138" width="148" height="72" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="646" y="168">样本 x</text>
+              <text class="label-small" x="630" y="192">生成或重建</text>
+
+              <rect x="606" y="262" width="148" height="72" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="644" y="292">数据 x</text>
+              <text class="label-small" x="628" y="316">训练集样本</text>
+              <path d="M 606 298 L 506 298" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-arrow)"></path>
+              <rect x="324" y="244" width="172" height="108" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="366" y="278">encoder</text>
+              <text class="label-small" x="346" y="306">qφ(z|x)</text>
+              <text class="label-small" x="346" y="328">近似真实后验</text>
+              <path d="M 324 298 L 224 298" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-arrow)"></path>
+              <rect x="72" y="262" width="148" height="72" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="101" y="292">后验 z</text>
+              <text class="label-small" x="92" y="316">哪些潜变量能解释 x</text>
+
+              <path d="M 146 262 C 128 236, 128 220, 146 210" fill="none" stroke="#16a394" stroke-width="2.2" marker-end="url(#vae-arrow)"></path>
+              <text class="label-small" x="52" y="244">KL：让 qφ(z|x) 不要离 p(z) 太远</text>
+              <path d="M 410 244 C 438 224, 490 216, 606 190" fill="none" stroke="#ff6b3d" stroke-width="2.2" marker-end="url(#vae-arrow)"></path>
+              <text class="label-small label-orange" x="522" y="238">重建：让 z 解释原始 x</text>
+
+              <rect x="790" y="138" width="116" height="196" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="816" y="176">ELBO</text>
+              <text class="label-small" x="812" y="210">重建项</text>
+              <line class="axis" x1="812" y1="226" x2="884" y2="226"></line>
+              <text class="label-small" x="812" y="252">KL 正则</text>
+              <text class="label-small" x="812" y="286">可优化的</text>
+              <text class="label-small" x="812" y="310">似然下界</text>
+            </svg>
+            <figcaption>自绘图：VAE 不是普通 autoencoder 加一点随机性。它一边用 \(q_\phi(z|x)\) 近似“哪个 \(z\) 解释这个 \(x\)”的后验，一边用 \(p_\theta(x|z)\) 学会从潜变量生成数据；ELBO 则把重建能力和潜空间正则化同时放进一个可优化目标。</figcaption>
+          </figure>
 
           <figure class="source-figure">
             <img src="https://lilianweng.github.io/posts/2018-08-12-vae/vae-graphical-model.png" alt="VAE 概率图模型" loading="lazy" />
@@ -1709,6 +1803,71 @@ window.siteContent = {
             x_{\mathrm{new}}\sim p_\theta(x)
             \text{ looks like real data.}
           \]</div>
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 420" role="img" aria-label="从有限样本到模型分布再到新样本的生成建模示意图">
+              <defs>
+                <marker id="dist-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+                <linearGradient id="dist-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.94"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.72"></stop>
+                </linearGradient>
+              </defs>
+              <rect x="22" y="28" width="282" height="324" fill="url(#dist-panel)" stroke="#d7e1ea"></rect>
+              <rect x="350" y="28" width="282" height="324" fill="url(#dist-panel)" stroke="#d7e1ea"></rect>
+              <rect x="678" y="28" width="282" height="324" fill="url(#dist-panel)" stroke="#d7e1ea"></rect>
+
+              <text class="label" x="46" y="62">1. 训练集只是有限采样</text>
+              <text class="label-small" x="46" y="86">样本点提示真实分布的形状，但不等于完整总体</text>
+              <line class="axis" x1="58" y1="290" x2="268" y2="290"></line>
+              <line class="axis" x1="58" y1="290" x2="58" y2="124"></line>
+              <rect x="82" y="238" width="18" height="52" fill="#d8eaf8"></rect>
+              <rect x="106" y="202" width="18" height="88" fill="#b9dcf4"></rect>
+              <rect x="130" y="158" width="18" height="132" fill="#8fc5ec"></rect>
+              <rect x="154" y="178" width="18" height="112" fill="#a5d3ef"></rect>
+              <rect x="178" y="226" width="18" height="64" fill="#c8e4f6"></rect>
+              <rect x="214" y="188" width="18" height="102" fill="#ffd9c8"></rect>
+              <rect x="238" y="226" width="18" height="64" fill="#ffe6d9"></rect>
+              <circle class="dot-real" cx="92" cy="299" r="4"></circle>
+              <circle class="dot-real" cx="116" cy="299" r="4"></circle>
+              <circle class="dot-real" cx="138" cy="299" r="4"></circle>
+              <circle class="dot-real" cx="165" cy="299" r="4"></circle>
+              <circle class="dot-real" cx="189" cy="299" r="4"></circle>
+              <circle class="dot-real" cx="224" cy="299" r="4"></circle>
+              <circle class="dot-real" cx="246" cy="299" r="4"></circle>
+              <text class="label-small" x="82" y="325">observed samples</text>
+
+              <text class="label" x="374" y="62">2. 选择模型族并调参数</text>
+              <text class="label-small" x="374" y="86">目标不是背样本，而是让 pθ 贴近 pdata</text>
+              <line class="axis" x1="386" y1="290" x2="596" y2="290"></line>
+              <line class="axis" x1="386" y1="290" x2="386" y2="124"></line>
+              <line class="guide" x1="386" y1="204" x2="596" y2="204"></line>
+              <path class="curve-real" d="M 394 281 C 432 274, 438 172, 482 152 C 522 134, 534 252, 594 274"></path>
+              <path class="curve-model" d="M 394 278 C 428 264, 446 236, 482 224 C 520 212, 548 150, 594 168"></path>
+              <text class="label-small label-blue" x="410" y="140">真实分布 pdata</text>
+              <text class="label-small label-orange" x="472" y="188">当前模型 pθ</text>
+              <path d="M 510 218 C 522 200, 535 183, 552 168" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#dist-arrow)"></path>
+              <text class="label-small" x="438" y="326">优化：降低分布差异</text>
+
+              <text class="label" x="702" y="62">3. 从学到的分布采样</text>
+              <text class="label-small" x="702" y="86">新样本不必出现在训练集里，但整体统计规律应一致</text>
+              <line class="axis" x1="714" y1="290" x2="924" y2="290"></line>
+              <line class="axis" x1="714" y1="290" x2="714" y2="124"></line>
+              <path class="curve-real" d="M 722 281 C 760 274, 766 172, 810 152 C 850 134, 862 252, 922 274"></path>
+              <path class="curve-soft" d="M 722 279 C 760 270, 768 176, 810 156 C 850 140, 864 248, 922 270"></path>
+              <circle class="dot-model" cx="766" cy="236" r="4"></circle>
+              <circle class="dot-model" cx="792" cy="166" r="4"></circle>
+              <circle class="dot-model" cx="824" cy="160" r="4"></circle>
+              <circle class="dot-model" cx="856" cy="220" r="4"></circle>
+              <circle class="dot-model" cx="886" cy="266" r="4"></circle>
+              <text class="label-small" x="748" y="326">new samples: x_new ~ pθ</text>
+
+              <path d="M 313 188 L 340 188" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#dist-arrow)"></path>
+              <path d="M 641 188 L 668 188" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#dist-arrow)"></path>
+            </svg>
+            <figcaption>自绘图：生成模型的核心不是复制训练样本，而是从有限样本中估计一个可采样的模型分布 \(p_\theta\)，再从这个分布中产生新的合理样本。</figcaption>
+          </figure>
           <p>这句话把“分布拟合”和“生成新数据”连接起来了。我们不是直接规定每个新样本长什么样，而是先学会什么样的样本概率高，什么样的样本概率低。然后通过采样，就能得到新的合理样本。</p>
           <p>以身高为例，如果模型学到的是均值 172.7、标准差 4.8 的正态分布，那么从这个正态分布采样，得到 173.9、168.2、181.0 这样的数字都很合理。它们不一定出现在原训练集中，但符合身高总体的统计特征。</p>
           <p>以图像为例，真实图片分布会给“有清晰边缘、合理纹理、物体结构正确”的图片较高概率，给随机噪声图片极低概率。如果模型学到了这个分布，那么采样时就更可能得到自然图片，而不是花屏。</p>
@@ -2222,6 +2381,60 @@ window.siteContent = {
           <figure class="source-figure">
             <img src="https://lilianweng.github.io/posts/2021-07-11-diffusion-models/generative-overview.png" alt="生成模型类型对比图" loading="lazy" />
             <figcaption>参考图：GAN、VAE、Flow-based model 和 Diffusion model 的结构对比。Diffusion 可以看成从数据到噪声、再从噪声回到数据的建模路线。图片来源：Lilian Weng, What are Diffusion Models?</figcaption>
+          </figure>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="Diffusion 前向加噪和反向生成过程示意图">
+              <defs>
+                <linearGradient id="diff-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="diff-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="340" fill="url(#diff-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="68">Diffusion 的核心是同一条路径的两个方向</text>
+              <text class="label-small" x="52" y="94">前向 q 是人为设计的加噪过程；反向 pθ 才是模型学习的生成过程。</text>
+
+              <rect x="72" y="132" width="132" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="114" y="162">x0</text>
+              <text class="label-small" x="100" y="188">真实数据</text>
+              <path d="M 204 170 L 292 170" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#diff-arrow)"></path>
+              <rect x="306" y="132" width="132" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="348" y="162">xt</text>
+              <text class="label-small" x="326" y="188">部分保留信号</text>
+              <path d="M 438 170 L 526 170" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#diff-arrow)"></path>
+              <rect x="540" y="132" width="132" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="582" y="162">xT</text>
+              <text class="label-small" x="558" y="188">近似高斯噪声</text>
+              <text class="label-small label-blue" x="278" y="122">前向加噪：q(xt|x0)</text>
+
+              <rect x="72" y="266" width="132" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="101" y="296">生成样本</text>
+              <text class="label-small" x="92" y="322">逐步去噪后得到</text>
+              <path d="M 306 304 L 218 304" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#diff-arrow)"></path>
+              <rect x="306" y="266" width="132" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="338" y="296">x_{t-1}</text>
+              <text class="label-small" x="324" y="322">更少噪声</text>
+              <path d="M 540 304 L 452 304" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#diff-arrow)"></path>
+              <rect x="540" y="266" width="132" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="582" y="296">xt</text>
+              <text class="label-small" x="560" y="322">当前噪声状态</text>
+              <text class="label-small label-orange" x="282" y="254">反向生成：pθ(x_{t-1}|xt)</text>
+
+              <path d="M 606 208 C 636 226, 652 244, 606 266" fill="none" stroke="#16a394" stroke-width="2.2" marker-end="url(#diff-arrow)"></path>
+              <rect x="728" y="132" width="178" height="210" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="772" y="166">网络学什么？</text>
+              <text class="label-small" x="754" y="202">预测噪声 epsilon</text>
+              <text class="label-small" x="754" y="232">或预测 score</text>
+              <text class="label-small" x="754" y="262">或预测速度 velocity</text>
+              <line class="axis" x1="754" y1="286" x2="882" y2="286"></line>
+              <text class="label-small" x="754" y="314">共同目的：</text>
+              <text class="label-small" x="754" y="334">指出从噪声回数据的方向</text>
+            </svg>
+            <figcaption>自绘图：前向过程 \(q\) 把数据一步步推向简单噪声分布，反向过程 \(p_\theta\) 则学习把噪声一步步拉回数据流形。DDPM 的噪声预测、score-based model 的 score 预测、Flow Matching 的速度预测，都是在给“从当前状态往数据方向走”提供可学习的方向信息。</figcaption>
           </figure>
 
           <h3>本文符号表</h3>

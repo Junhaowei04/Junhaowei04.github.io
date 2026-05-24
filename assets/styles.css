@@ -192,12 +192,14 @@ button {
 .post-list,
 .aside-content {
   display: grid;
+  min-width: 0;
   gap: 0;
 }
 
 .post-card,
 .aside-card {
   overflow: hidden;
+  min-width: 0;
   background: transparent;
   border: 0;
   border-top: 1px solid var(--line);
@@ -344,6 +346,7 @@ button {
 }
 
 .article-card {
+  min-width: 0;
   padding: clamp(24px, 4vw, 46px);
   background: transparent;
   border: 1px solid var(--line);
@@ -396,6 +399,42 @@ button {
   border-radius: 0;
   font-size: 0.8rem;
   font-weight: 700;
+}
+
+.article-toc {
+  margin: 28px 0 34px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.article-toc-title {
+  margin-bottom: 10px;
+  color: #2f3642;
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.article-toc ol {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 22px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.article-toc a {
+  display: block;
+  color: #4d5967;
+  font-size: 0.94rem;
+  line-height: 1.55;
+}
+
+.article-toc a:hover,
+.article-toc a:focus-visible {
+  color: var(--blue);
 }
 
 .article-body {
@@ -489,6 +528,89 @@ button {
 
 .source-figure figcaption {
   padding: 10px 0 12px;
+  color: #66727f;
+  font-size: 0.9rem;
+  line-height: 1.75;
+  text-align: center;
+}
+
+.visual-figure {
+  margin: 28px 0;
+  padding: 18px 0 12px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.visual-figure svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: linear-gradient(180deg, rgba(248, 251, 253, 0.82), rgba(244, 248, 251, 0.58));
+}
+
+.visual-figure .axis,
+.visual-figure .guide {
+  fill: none;
+  stroke: #b8c5d1;
+  stroke-width: 1;
+}
+
+.visual-figure .guide {
+  stroke-dasharray: 5 7;
+  opacity: 0.7;
+}
+
+.visual-figure .curve-real {
+  fill: none;
+  stroke: #2f80ed;
+  stroke-width: 3.2;
+}
+
+.visual-figure .curve-model {
+  fill: none;
+  stroke: #ff6b3d;
+  stroke-width: 3.2;
+}
+
+.visual-figure .curve-soft {
+  fill: none;
+  stroke: #16a394;
+  stroke-width: 2.4;
+  stroke-dasharray: 7 7;
+}
+
+.visual-figure .dot-real {
+  fill: #2f80ed;
+}
+
+.visual-figure .dot-model {
+  fill: #ff6b3d;
+}
+
+.visual-figure .label {
+  fill: #344052;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.visual-figure .label-small {
+  fill: #66727f;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.visual-figure .label-blue {
+  fill: #2f80ed;
+}
+
+.visual-figure .label-orange {
+  fill: #ff6b3d;
+}
+
+.visual-figure figcaption {
+  padding-top: 10px;
   color: #66727f;
   font-size: 0.9rem;
   line-height: 1.75;
@@ -885,6 +1007,10 @@ button {
 
   .post-content {
     padding: 22px;
+  }
+
+  .article-toc ol {
+    grid-template-columns: 1fr;
   }
 
   .back-top {

@@ -102,8 +102,49 @@ function renderArticle(post) {
       <div class="article-body">${post.body || "<p>文章正在整理中。</p>"}</div>
     </article>
   `;
+  enhanceArticleNavigation(postList);
   typesetMath(postList);
   postList.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function slugifyHeading(text, index) {
+  const normalized = text
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return normalized || `section-${index + 1}`;
+}
+
+function enhanceArticleNavigation(root) {
+  const article = root.querySelector(".article-card");
+  const header = root.querySelector(".article-header");
+  const body = root.querySelector(".article-body");
+  if (!article || !header || !body) return;
+
+  const headings = [...body.querySelectorAll("h2")];
+  if (headings.length < 4) return;
+
+  const usedIds = new Set();
+  const tocItems = headings.map((heading, index) => {
+    let id = heading.id || slugifyHeading(heading.textContent || "", index);
+    while (usedIds.has(id)) id = `${id}-${index + 1}`;
+    usedIds.add(id);
+    heading.id = id;
+
+    return `<li><a href="#${id}">${heading.textContent}</a></li>`;
+  });
+
+  header.insertAdjacentHTML(
+    "afterend",
+    `
+      <nav class="article-toc" aria-label="文章目录">
+        <div class="article-toc-title">目录</div>
+        <ol>${tocItems.join("")}</ol>
+      </nav>
+    `,
+  );
 }
 
 function typesetMath(root, attempt = 0) {
