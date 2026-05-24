@@ -19,6 +19,7 @@ Current interests:
 
 Current posts:
 
+- GAN 基础理论：从对抗训练到 JS 散度、DCGAN 与 WGAN
 - VAE 基础理论：从潜变量模型到 ELBO、重参数化与生成
 - 生成模型入门：从概率分布到分布拟合
 - Diffusion Model 基础理论：从生成建模到 DDPM、Score 与 Flow Matching

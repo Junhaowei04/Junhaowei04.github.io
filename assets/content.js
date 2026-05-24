@@ -2,6 +2,713 @@ window.siteContent = {
   author: "MomenT",
   posts: [
     {
+      slug: "gan-foundations",
+      title: "GAN 基础理论：从对抗训练到 JS 散度、DCGAN 与 WGAN",
+      date: "2026-05-24",
+      category: "学习笔记",
+      summary:
+        "一篇面向生成模型初学者的 GAN 长文。我们从分布拟合和隐式生成模型讲起，完整推导原始 GAN 的 minimax 目标、最优判别器、JS 散度、非饱和损失，并解释模式崩溃、训练不稳定、DCGAN、LSGAN、WGAN 和 WGAN-GP。",
+      tags: [
+        "GAN",
+        "Generative Model",
+        "Machine Learning",
+        "Adversarial Training",
+        "JS Divergence",
+        "Wasserstein Distance",
+        "DCGAN",
+        "WGAN"
+      ],
+      cover: "cover-e",
+      body: String.raw`
+        <p class="lead">GAN，也就是 Generative Adversarial Network，是深度生成模型历史上非常有代表性的一条路线。它的想法听起来很像故事：一个生成器 \(G\) 负责造假，一个判别器 \(D\) 负责鉴别真假，二者互相对抗，最后生成器变得足够会造样本。但如果只停在这个故事层面，就很容易错过 GAN 真正的理论核心：它是在用一个二分类问题间接比较真实分布 \(p_{\mathrm{data}}\) 和生成分布 \(p_g\)。这篇文章会从分布拟合讲起，完整推导原始 GAN 的目标函数、最优判别器、JS 散度、非饱和损失和训练困难，再把 DCGAN、LSGAN、WGAN、WGAN-GP 放到同一张地图里。</p>
+
+        <section class="article-section">
+          <h2>0. 先把 GAN 的位置摆正</h2>
+          <p>在前面的生成模型入门文章里，我们说过：生成模型的共同目标是让模型分布 \(p_\theta(x)\) 接近真实数据分布 \(p_{\mathrm{data}}(x)\)。VAE 通过潜变量模型和 ELBO 来近似最大化似然；Diffusion 通过加噪和反向去噪学习一条从噪声到数据的路径。GAN 走的是另一条路。</p>
+          <div class="insight-box">GAN 不要求我们显式写出 \(p_g(x)\) 的概率密度，也不直接最大化似然。它让一个判别器学习区分真实样本和生成样本，再用判别器给出的信号推动生成器改进。</div>
+          <p>这句话里最容易误解的是“不显式写出密度”。不显式写出 \(p_g(x)\)，不代表没有生成分布。生成器通常写成：</p>
+          <div class="equation">\[
+            z\sim p_z(z),\qquad x=G_\theta(z).
+          \]</div>
+          <p>这里 \(p_z\) 是一个容易采样的简单分布，比如标准高斯或均匀分布。只要我们从 \(p_z\) 采样 \(z\)，再经过 \(G_\theta\)，就会在数据空间里诱导出一个分布。这个分布就是 \(p_g(x)\)。它可能没有简单密度公式，但它确实存在。</p>
+          <p>所以 GAN 的目标仍然是：</p>
+          <div class="equation">\[
+            p_g(x)\approx p_{\mathrm{data}}(x).
+          \]</div>
+          <p>只是 GAN 不通过显式似然去做这件事，而是把“两个分布是否接近”改写成“能不能训练一个分类器区分它们”。如果分类器很容易区分，说明两个分布差得远；如果分类器只能乱猜，说明两个分布已经很接近。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>1. GAN 的两个网络分别做什么？</h2>
+          <p>原始 GAN 有两个模型。</p>
+          <ol>
+            <li><strong>生成器</strong> \(G_\theta\)：输入噪声 \(z\)，输出生成样本 \(G_\theta(z)\)。</li>
+            <li><strong>判别器</strong> \(D_\phi\)：输入一个样本 \(x\)，输出一个介于 0 和 1 之间的数，表示它认为 \(x\) 来自真实数据而不是生成器的概率。</li>
+          </ol>
+          <p>如果 \(D_\phi(x)\) 很接近 1，判别器认为 \(x\) 很像真实样本；如果 \(D_\phi(x)\) 很接近 0，判别器认为 \(x\) 很像生成样本。训练时，判别器希望把真实样本判成 1，把生成样本判成 0；生成器希望自己生成的样本被判别器判成 1。</p>
+
+          <figure class="source-figure">
+            <img src="https://developers.google.com/static/machine-learning/gan/images/gan_diagram.svg?hl=zh-cn" alt="GAN 生成器和判别器结构图" loading="lazy" />
+            <figcaption>参考图：GAN 的基本结构。生成器把随机噪声变成样本，判别器同时看真实样本和生成样本，并输出真假判断。图片来源：Google Developers, Generative Adversarial Networks。</figcaption>
+          </figure>
+
+          <p>这张图很适合初学者建立直觉，但还不够。真正需要问的是：判别器为什么能提供分布差异信号？生成器为什么沿着这个信号更新后，\(p_g\) 会靠近 \(p_{\mathrm{data}}\)？这两个问题要靠目标函数和最优判别器推导来回答。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>2. 原始 GAN 的 minimax 目标</h2>
+          <p>Goodfellow 等人在 2014 年的开山论文里给出的目标是：</p>
+          <div class="equation">\[
+            \min_G\max_D V(D,G)
+            =
+            \mathbb{E}_{x\sim p_{\mathrm{data}}}
+            [\log D(x)]
+            +
+            \mathbb{E}_{z\sim p_z}
+            [\log(1-D(G(z)))].
+          \]</div>
+          <p>把 \(G(z)\) 诱导出的分布记作 \(p_g\)，第二项也可以写成：</p>
+          <div class="equation">\[
+            \mathbb{E}_{x\sim p_g}[\log(1-D(x))].
+          \]</div>
+          <p>于是目标函数变成：</p>
+          <div class="equation">\[
+            V(D,G)
+            =
+            \mathbb{E}_{x\sim p_{\mathrm{data}}}
+            [\log D(x)]
+            +
+            \mathbb{E}_{x\sim p_g}
+            [\log(1-D(x))].
+          \]</div>
+          <p>先看判别器。对于真实样本，判别器想让 \(D(x)\) 越大越好，因为 \(\log D(x)\) 越大。对于生成样本，判别器想让 \(D(x)\) 越小越好，因为 \(\log(1-D(x))\) 越大。因此判别器最大化 \(V(D,G)\)。</p>
+          <p>再看生成器。生成器只影响第二项。它希望生成样本被判别器当成真实样本，也就是希望 \(D(G(z))\) 变大。可是目标里是 \(\log(1-D(G(z)))\)，如果 \(D(G(z))\) 变大，这一项就变小。因此生成器最小化 \(V(D,G)\)。</p>
+          <div class="paper-note">这里的 minimax 不是装饰词。它表示两方目标相反：判别器要把两类样本分开，生成器要让两类样本混在一起。GAN 的训练动态来自这个对抗结构。</div>
+        </section>
+
+        <section class="article-section">
+          <h2>3. 为什么判别器是在比较两个分布？</h2>
+          <p>现在进入 GAN 理论里最关键的推导。把期望写成积分：</p>
+          <div class="equation">\[
+            V(D,G)
+            =
+            \int p_{\mathrm{data}}(x)\log D(x)\,dx
+            +
+            \int p_g(x)\log(1-D(x))\,dx.
+          \]</div>
+          <p>合并成一个积分：</p>
+          <div class="equation">\[
+            V(D,G)
+            =
+            \int
+            \left[
+            p_{\mathrm{data}}(x)\log D(x)
+            +
+            p_g(x)\log(1-D(x))
+            \right]dx.
+          \]</div>
+          <p>现在固定生成器 \(G\)，也就是固定 \(p_g\)。判别器要选每个 \(x\) 上的 \(D(x)\)，使被积函数最大。对某个固定的 \(x\)，记：</p>
+          <div class="equation">\[
+            a=p_{\mathrm{data}}(x),\qquad b=p_g(x),\qquad y=D(x).
+          \]</div>
+          <p>那么这一点上的问题就是最大化：</p>
+          <div class="equation">\[
+            f(y)=a\log y+b\log(1-y),
+            \qquad 0<y<1.
+          \]</div>
+          <p>对 \(y\) 求导：</p>
+          <div class="equation">\[
+            f'(y)=\frac{a}{y}-\frac{b}{1-y}.
+          \]</div>
+          <p>令导数为 0：</p>
+          <div class="equation">\[
+            \frac{a}{y}
+            =
+            \frac{b}{1-y}.
+          \]</div>
+          <p>两边交叉相乘：</p>
+          <div class="equation">\[
+            a(1-y)=by.
+          \]</div>
+          <p>展开：</p>
+          <div class="equation">\[
+            a-ay=by.
+          \]</div>
+          <p>把含 \(y\) 的项放到一边：</p>
+          <div class="equation">\[
+            a=(a+b)y.
+          \]</div>
+          <p>所以最优判别器是：</p>
+          <div class="equation">\[
+            D_G^*(x)
+            =
+            \frac{p_{\mathrm{data}}(x)}
+            {p_{\mathrm{data}}(x)+p_g(x)}.
+          \]</div>
+          <p>这个公式非常重要。它说明判别器不是在学一个神秘的“真假审美”，而是在估计两个分布在每个位置的相对大小。如果某个 \(x\) 附近真实数据密度远大于生成密度，最优判别器接近 1；如果生成密度远大于真实密度，最优判别器接近 0；如果两者一样大，最优判别器就是 \(1/2\)。</p>
+          <div class="insight-box">当 \(p_g=p_{\mathrm{data}}\) 时，最优判别器处处是 \(D_G^*(x)=1/2\)。这就是“判别器只能乱猜”的数学含义。</div>
+        </section>
+
+        <section class="article-section">
+          <h2>4. 把最优判别器代回去：JS 散度从哪里来？</h2>
+          <p>接下来把 \(D_G^*(x)\) 代回原目标。我们得到：</p>
+          <div class="equation">\[
+            V(D_G^*,G)
+            =
+            \mathbb{E}_{x\sim p_{\mathrm{data}}}
+            \left[
+            \log
+            \frac{p_{\mathrm{data}}(x)}
+            {p_{\mathrm{data}}(x)+p_g(x)}
+            \right]
+            +
+            \mathbb{E}_{x\sim p_g}
+            \left[
+            \log
+            \frac{p_g(x)}
+            {p_{\mathrm{data}}(x)+p_g(x)}
+            \right].
+          \]</div>
+          <p>为了看出它和 JS 散度的关系，引入混合分布：</p>
+          <div class="equation">\[
+            m(x)=\frac{1}{2}
+            \left(
+            p_{\mathrm{data}}(x)+p_g(x)
+            \right).
+          \]</div>
+          <p>因为 \(p_{\mathrm{data}}(x)+p_g(x)=2m(x)\)，所以第一项可以写成：</p>
+          <div class="equation">\[
+            \mathbb{E}_{p_{\mathrm{data}}}
+            \left[
+            \log
+            \frac{p_{\mathrm{data}}(x)}
+            {2m(x)}
+            \right]
+            =
+            \mathbb{E}_{p_{\mathrm{data}}}
+            \left[
+            \log
+            \frac{p_{\mathrm{data}}(x)}
+            {m(x)}
+            \right]
+            -
+            \log 2.
+          \]</div>
+          <p>第一部分就是 \(D_{\mathrm{KL}}(p_{\mathrm{data}}\|m)\)，所以第一项是：</p>
+          <div class="equation">\[
+            D_{\mathrm{KL}}(p_{\mathrm{data}}\|m)-\log 2.
+          \]</div>
+          <p>同理，第二项是：</p>
+          <div class="equation">\[
+            D_{\mathrm{KL}}(p_g\|m)-\log 2.
+          \]</div>
+          <p>两项加起来：</p>
+          <div class="equation">\[
+            V(D_G^*,G)
+            =
+            D_{\mathrm{KL}}(p_{\mathrm{data}}\|m)
+            +
+            D_{\mathrm{KL}}(p_g\|m)
+            -
+            2\log 2.
+          \]</div>
+          <p>JS 散度定义为：</p>
+          <div class="equation">\[
+            D_{\mathrm{JS}}(p_{\mathrm{data}}\|p_g)
+            =
+            \frac{1}{2}
+            D_{\mathrm{KL}}(p_{\mathrm{data}}\|m)
+            +
+            \frac{1}{2}
+            D_{\mathrm{KL}}(p_g\|m).
+          \]</div>
+          <p>所以：</p>
+          <div class="equation">\[
+            V(D_G^*,G)
+            =
+            -\log 4
+            +
+            2D_{\mathrm{JS}}(p_{\mathrm{data}}\|p_g).
+          \]</div>
+          <p>现在结论非常清楚：如果判别器足够强并且总能达到最优，那么训练生成器最小化原始 GAN 目标，等价于最小化真实分布和生成分布之间的 JS 散度。</p>
+
+          <figure class="source-figure">
+            <img src="https://cs.stanford.edu/people/karpathy/gan/gan.png" alt="GAN 训练中真实分布、生成分布和判别器的可视化" loading="lazy" />
+            <figcaption>参考图：一维 GAN 训练可视化。可以把蓝色/绿色分布理解为真实分布与生成分布，把判别器理解为给生成器提供方向信号的分类器。图片来源：Andrej Karpathy, GAN demo。</figcaption>
+          </figure>
+        </section>
+
+        <section class="article-section">
+          <h2>5. JS 散度结论为什么既漂亮又危险？</h2>
+          <p>从理论上看，上一节的结论非常漂亮：GAN 有明确的分布匹配目标，最优点是 \(p_g=p_{\mathrm{data}}\)。但实际训练 GAN 时，很多困难也从这里出现。</p>
+          <p>第一个问题是：判别器不可能每一步都真正达到最优。训练中我们只是在有限 minibatch 上做几步梯度更新，所以 \(D\) 和 \(G\) 总是在相互追逐。这个动态不是普通的单目标优化，而是一个博弈问题。</p>
+          <p>第二个问题是：如果真实分布和生成分布的支撑几乎不重叠，JS 散度容易饱和。简单说，如果判别器太容易把真假样本分开，它的输出会接近 0 或 1，生成器得到的梯度可能很弱。</p>
+          <p>第三个问题是：生成器可能学会只覆盖真实分布的一部分模式。这就是模式崩溃。比如真实数据里有 10 类数字，生成器只生成其中 2 类，也可能一时骗过判别器，但它没有覆盖整个真实分布。</p>
+          <div class="paper-note">GAN 的难点不是“目标没意义”，而是“这个目标在神经网络和有限样本训练中很难稳定优化”。理解这一点，后面看 WGAN、gradient penalty、spectral normalization、hinge loss 时才知道它们在修哪里。</div>
+        </section>
+
+        <section class="article-section">
+          <h2>5.5 支撑不重叠时，为什么 JS 散度会让训练变难？</h2>
+          <p>这里值得单独说细一点。支撑可以理解为一个分布真正放概率质量的区域。举一个极简例子：真实分布只在 \(x=0\) 附近，生成分布只在 \(x=10\) 附近。两个区域离得很远，几乎没有重叠。</p>
+          <p>此时判别器的任务太容易了。看到 \(x\) 靠近 0，就判真；靠近 10，就判假。最优判别器几乎是：</p>
+          <div class="equation">\[
+            D^*(x)\approx
+            \begin{cases}
+            1, & x\in \mathrm{supp}(p_{\mathrm{data}}),\\
+            0, & x\in \mathrm{supp}(p_g).
+            \end{cases}
+          \]</div>
+          <p>这在分类角度是好事，但在生成器训练角度未必是好事。因为生成器需要的不是“你错得很离谱”这句评价，而是“往哪个方向移动会更接近真实分布”这种可用梯度。如果判别器输出已经饱和到接近 0，原始 minimax 目标给生成器的梯度可能非常弱。</p>
+          <p>再从 JS 散度看。当两个分布完全不重叠时，混合分布 \(m=(p_{\mathrm{data}}+p_g)/2\)。在真实分布支撑上，\(m=p_{\mathrm{data}}/2\)，所以：</p>
+          <div class="equation">\[
+            D_{\mathrm{KL}}(p_{\mathrm{data}}\|m)
+            =
+            \int p_{\mathrm{data}}(x)
+            \log
+            \frac{p_{\mathrm{data}}(x)}
+            {p_{\mathrm{data}}(x)/2}
+            dx
+            =
+            \log 2.
+          \]</div>
+          <p>同理：</p>
+          <div class="equation">\[
+            D_{\mathrm{KL}}(p_g\|m)=\log 2.
+          \]</div>
+          <p>因此：</p>
+          <div class="equation">\[
+            D_{\mathrm{JS}}(p_{\mathrm{data}}\|p_g)
+            =
+            \frac{1}{2}\log2
+            +
+            \frac{1}{2}\log2
+            =
+            \log2.
+          \]</div>
+          <p>也就是说，只要两个分布不重叠，不管它们距离是 1 还是 100，JS 散度都可能达到同一个饱和值。对生成器来说，这个数没有告诉它“向左移动一点会更好”。Wasserstein 距离的直觉优势就在这里：如果生成分布从 10 移到 9，虽然还没和真实分布重叠，但运输距离已经变小，目标可以给出更连续的改进信号。</p>
+          <div class="insight-box">这就是为什么 WGAN 不是简单追求一个更时髦的 loss。它试图解决的是：当分布还离得很远时，训练信号是否仍然能告诉生成器往哪里走。</div>
+        </section>
+
+        <section class="article-section">
+          <h2>6. 为什么实际训练常用非饱和生成器损失？</h2>
+          <p>原始 minimax 中，生成器最小化：</p>
+          <div class="equation">\[
+            L_G^{\mathrm{minimax}}
+            =
+            \mathbb{E}_{z\sim p_z}
+            [\log(1-D(G(z)))].
+          \]</div>
+          <p>如果训练早期判别器很强，那么 \(D(G(z))\) 接近 0。此时 \(\log(1-D(G(z)))\) 接近 \(\log 1=0\)，对生成器的有效梯度可能很弱。Goodfellow 在论文里也讨论了一个更常用的替代目标：不要最小化 \(\log(1-D(G(z)))\)，而是最大化 \(\log D(G(z))\)。写成最小化 loss 就是：</p>
+          <div class="equation">\[
+            L_G^{\mathrm{non\text{-}saturating}}
+            =
+            -
+            \mathbb{E}_{z\sim p_z}
+            [\log D(G(z))].
+          \]</div>
+          <p>这个目标和原始 minimax 有相同的理想最优点：生成器仍然希望让判别器把假样本判成真。但训练早期，当 \(D(G(z))\) 很小的时候，\(-\log D(G(z))\) 会很大，能给生成器更强的更新信号。</p>
+          <p>从实现角度看，判别器通常使用二分类交叉熵。训练判别器时：</p>
+          <div class="equation">\[
+            L_D
+            =
+            -
+            \mathbb{E}_{x\sim p_{\mathrm{data}}}
+            [\log D(x)]
+            -
+            \mathbb{E}_{z\sim p_z}
+            [\log(1-D(G(z)))].
+          \]</div>
+          <p>训练生成器时，常用非饱和形式：</p>
+          <div class="equation">\[
+            L_G
+            =
+            -
+            \mathbb{E}_{z\sim p_z}
+            [\log D(G(z))].
+          \]</div>
+          <p>注意这里有一个很容易混淆的点：判别器更新时，生成样本通常被当成常数，不更新生成器；生成器更新时，判别器参数通常固定，只用判别器的梯度信号更新生成器。这就是交替训练。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>7. 训练算法：每一步到底在更新什么？</h2>
+          <p>一次典型 GAN 训练可以拆成两步。</p>
+          <p><strong>第一步，更新判别器。</strong>采一批真实样本 \(x^{(i)}\sim p_{\mathrm{data}}\)，采一批噪声 \(z^{(i)}\sim p_z\)，生成假样本 \(\tilde{x}^{(i)}=G_\theta(z^{(i)})\)。判别器最小化：</p>
+          <div class="equation">\[
+            L_D
+            =
+            -
+            \frac{1}{m}
+            \sum_{i=1}^{m}
+            \left[
+            \log D_\phi(x^{(i)})
+            +
+            \log(1-D_\phi(\tilde{x}^{(i)}))
+            \right].
+          \]</div>
+          <p>这一步只更新 \(\phi\)，也就是判别器参数。</p>
+          <p><strong>第二步，更新生成器。</strong>再采一批噪声 \(z^{(i)}\)，生成 \(\tilde{x}^{(i)}=G_\theta(z^{(i)})\)。生成器最小化非饱和损失：</p>
+          <div class="equation">\[
+            L_G
+            =
+            -
+            \frac{1}{m}
+            \sum_{i=1}^{m}
+            \log D_\phi(G_\theta(z^{(i)})).
+          \]</div>
+          <p>这一步固定判别器参数，只更新生成器参数 \(\theta\)。虽然判别器不更新，但梯度会穿过判别器传到生成器，因为 \(D_\phi(G_\theta(z))\) 对 \(G_\theta(z)\) 有导数，而 \(G_\theta(z)\) 又对 \(\theta\) 有导数。</p>
+          <p>因此，判别器像一个会变化的损失函数。它不是最终目标本身，而是一个不断学习的训练信号。</p>
+
+          <figure class="source-figure">
+            <img src="https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/tutorials/source_zh_cn/generative/images/train_test.gif" alt="GAN 训练过程中生成样本逐步改善的动图" loading="lazy" />
+            <figcaption>参考动图：GAN 训练过程中生成样本逐步变清晰。读这类动图时要注意：视觉质量改善背后，是 \(p_g\) 在判别器信号推动下逐渐靠近 \(p_{\mathrm{data}}\)。图片来源：MindSpore GAN tutorial。</figcaption>
+          </figure>
+        </section>
+
+        <section class="article-section">
+          <h2>7.5 实现 GAN 时最容易错的细节</h2>
+          <p>很多人第一次写 GAN，公式看懂了，但代码会在一些细节上出问题。这里把几个最常见的点讲清楚。</p>
+          <h3>第一，判别器更新时要切断生成器梯度</h3>
+          <p>更新判别器时，假样本 \(\tilde{x}=G(z)\) 只是判别器的训练数据。此时我们希望更新 \(D\)，不希望更新 \(G\)。如果代码里没有切断 \(\tilde{x}\) 到生成器参数的计算图，就可能浪费显存，甚至错误地累积生成器梯度。PyTorch 里常见做法是对 fake samples 使用 detach。</p>
+          <p>数学上，这相当于判别器优化：</p>
+          <div class="equation">\[
+            \min_\phi L_D(\phi;\theta),
+          \]</div>
+          <p>其中 \(\theta\) 固定。虽然 \(L_D\) 里出现了 \(G_\theta(z)\)，但这一步不对 \(\theta\) 求导。</p>
+          <h3>第二，生成器更新时不要把假样本标签设成假</h3>
+          <p>更新生成器时，我们希望 \(D(G(z))\) 变大，所以在二分类交叉熵实现里，生成样本对应的目标标签应该是真，也就是 1。很多初学者会想：“这明明是假样本，标签为什么是真？”原因是这一步不是训练判别器识别真假，而是训练生成器骗过判别器。</p>
+          <h3>第三，logits 和 probability 不要混用</h3>
+          <p>如果判别器最后已经接了 sigmoid，输出是概率，可以用普通 binary cross entropy。如果使用 BCEWithLogitsLoss，那么判别器最后不应该再手动接 sigmoid，因为这个损失内部已经包含了更数值稳定的 sigmoid + BCE。混用会让梯度和数值范围变得不对。</p>
+          <h3>第四，判别器太强或太弱都不好</h3>
+          <p>如果判别器太弱，它给不出有意义的学习信号；如果判别器太强，生成器可能拿不到有效梯度。实际训练中经常需要调学习率、更新步数、网络容量和正则化强度。WGAN 常常会让 critic 多更新几步；普通 GAN 则不一定，取决于任务和架构。</p>
+          <h3>第五，一些训练技巧是在调动态平衡</h3>
+          <p>one-sided label smoothing、instance noise、数据增强、谱归一化、梯度惩罚、TTUR、EMA 等技巧，本质上都在处理同一个问题：让判别器足够有用，但不要变成一个让生成器无路可走的极端分类器。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>8. 判别器还有一个解释：密度比估计</h2>
+          <p>从最优判别器公式出发：</p>
+          <div class="equation">\[
+            D_G^*(x)
+            =
+            \frac{p_{\mathrm{data}}(x)}
+            {p_{\mathrm{data}}(x)+p_g(x)}.
+          \]</div>
+          <p>移项可以得到：</p>
+          <div class="equation">\[
+            1-D_G^*(x)
+            =
+            \frac{p_g(x)}
+            {p_{\mathrm{data}}(x)+p_g(x)}.
+          \]</div>
+          <p>两式相除：</p>
+          <div class="equation">\[
+            \frac{D_G^*(x)}
+            {1-D_G^*(x)}
+            =
+            \frac{p_{\mathrm{data}}(x)}
+            {p_g(x)}.
+          \]</div>
+          <p>这说明判别器隐含地估计了真实分布和生成分布的密度比。这个视角很重要，因为它解释了为什么一个分类器可以帮助分布匹配：分类器不是只给真假标签，它在理想情况下给出了“这里真实数据相对生成数据多多少”的信息。</p>
+          <p>当 \(D(x)>1/2\) 时，说明 \(p_{\mathrm{data}}(x)>p_g(x)\)，生成器在这个区域覆盖不足；当 \(D(x)<1/2\) 时，说明 \(p_g(x)>p_{\mathrm{data}}(x)\)，生成器可能在这个区域放了过多概率质量。GAN 训练就是试图通过这些信号重新分配生成分布的概率质量。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>9. 模式崩溃：为什么 GAN 会只生成少数类型？</h2>
+          <p>模式崩溃是 GAN 最经典的问题之一。所谓模式，指真实分布中的不同高概率区域。比如 MNIST 有 10 个数字类别，自然图像有许多物体、姿态、纹理和场景。如果生成器只覆盖其中一小部分，就叫模式崩溃。</p>
+          <p>一个直观解释是：生成器的目标是骗过当前判别器，而不是显式最大化覆盖所有模式的似然。如果某个阶段生成器发现一类样本特别容易骗过判别器，它可能把大量噪声输入都映射到这类样本附近。判别器之后会追上来，但生成器可能又跳到另一个少数模式，于是训练出现震荡。</p>
+          <p>用分布语言说，模式崩溃意味着 \(p_g\) 没有覆盖 \(p_{\mathrm{data}}\) 的全部高概率区域。它可能在某些区域生成质量很好，但整体分布缺少多样性。</p>
+          <figure class="source-figure">
+            <img src="https://developers.google.com/static/machine-learning/gan/images/bad_gan.svg?hl=zh-cn" alt="GAN 生成质量较差的示意图" loading="lazy" />
+            <figcaption>参考图：GAN 训练不好时，生成样本可能缺少真实数据的结构和多样性。图片来源：Google Developers, Generative Adversarial Networks。</figcaption>
+          </figure>
+          <figure class="source-figure">
+            <img src="https://developers.google.com/static/machine-learning/gan/images/good_gan.svg?hl=zh-cn" alt="GAN 生成质量较好的示意图" loading="lazy" />
+            <figcaption>参考图：训练较好时，生成样本更接近真实数据分布。评价 GAN 时不能只看单张样本，还要看分布覆盖和多样性。图片来源：Google Developers, Generative Adversarial Networks。</figcaption>
+          </figure>
+        </section>
+
+        <section class="article-section">
+          <h2>10. DCGAN：让 GAN 在图像上真正稳定起来的一步</h2>
+          <p>原始 GAN 论文提出了核心理论，但早期 GAN 很难训练。DCGAN，也就是 Deep Convolutional GAN，是把卷积网络结构系统引入 GAN 的重要工作。它的贡献不只是“用了卷积”，而是总结了一套对图像 GAN 很有影响的架构经验。</p>
+          <ol>
+            <li>用卷积和转置卷积替代全连接上采样结构，让网络更适合图像。</li>
+            <li>生成器和判别器中使用 Batch Normalization，缓解训练不稳定。</li>
+            <li>生成器常用 ReLU，最后输出层常用 Tanh。</li>
+            <li>判别器常用 LeakyReLU，避免负半轴完全没有梯度。</li>
+            <li>避免手工池化，使用带步幅的卷积完成下采样和上采样。</li>
+          </ol>
+          <p>从理论角度看，DCGAN 没有改变原始 GAN 的分布匹配目标；它主要改进了函数族，也就是 \(G_\theta\) 和 \(D_\phi\) 的表达方式。一个更适合图像结构的函数族，可以让对抗训练更稳定，也能生成更清晰的样本。</p>
+          <p>读 DCGAN 论文时，不要只记住“GAN 加 CNN”。更应该问：哪些架构选择让梯度更容易传播？哪些选择让生成器更适合逐步构造空间结构？哪些选择让判别器不至于太快过强或太弱？</p>
+        </section>
+
+        <section class="article-section">
+          <h2>11. LSGAN、hinge loss：为什么要改损失函数？</h2>
+          <p>原始 GAN 用二分类交叉熵。这个选择有清楚的理论解释，但实际训练中可能出现梯度饱和和不稳定。于是很多工作尝试替换判别器和生成器的损失。</p>
+          <h3>LSGAN</h3>
+          <p>LSGAN 使用最小二乘损失。直观上，它不只要求判别器把真假样本分到正确一侧，还会惩罚样本离目标标签的距离。常见形式是：</p>
+          <div class="equation">\[
+            L_D
+            =
+            \frac{1}{2}
+            \mathbb{E}_{x\sim p_{\mathrm{data}}}
+            [(D(x)-1)^2]
+            +
+            \frac{1}{2}
+            \mathbb{E}_{z\sim p_z}
+            [D(G(z))^2].
+          \]</div>
+          <div class="equation">\[
+            L_G
+            =
+            \frac{1}{2}
+            \mathbb{E}_{z\sim p_z}
+            [(D(G(z))-1)^2].
+          \]</div>
+          <p>它的动机是让生成样本即使已经在判别器的正确一侧，也能继续得到距离信息，从而缓解梯度变弱。</p>
+          <h3>Hinge loss</h3>
+          <p>许多现代图像 GAN 使用 hinge loss。判别器常写成不带 sigmoid 的打分函数 \(s_\phi(x)\)。损失为：</p>
+          <div class="equation">\[
+            L_D
+            =
+            \mathbb{E}_{x\sim p_{\mathrm{data}}}
+            [\max(0,1-s_\phi(x))]
+            +
+            \mathbb{E}_{z\sim p_z}
+            [\max(0,1+s_\phi(G(z)))].
+          \]</div>
+          <div class="equation">\[
+            L_G
+            =
+            -
+            \mathbb{E}_{z\sim p_z}
+            [s_\phi(G(z))].
+          \]</div>
+          <p>hinge loss 的直觉是分类间隔：真实样本分数希望至少大于 1，生成样本分数希望至少小于 -1。超过间隔后，判别器不再无止境地推远样本，而生成器仍然试图提高生成样本分数。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>12. WGAN：为什么要从 JS 散度换成 Wasserstein 距离？</h2>
+          <p>WGAN 的核心动机是：当真实分布和生成分布支撑不重叠时，JS 散度可能不能提供平滑有效的训练信号。Wasserstein-1 距离，也叫 Earth Mover 距离，可以理解为把一个分布的质量搬运成另一个分布所需的最小代价。</p>
+          <p>它的一个直观定义是：</p>
+          <div class="equation">\[
+            W_1(p_{\mathrm{data}},p_g)
+            =
+            \inf_{\gamma\in\Pi(p_{\mathrm{data}},p_g)}
+            \mathbb{E}_{(x,y)\sim\gamma}
+            [\|x-y\|].
+          \]</div>
+          <p>这里 \(\Pi(p_{\mathrm{data}},p_g)\) 表示所有边缘分布分别为 \(p_{\mathrm{data}}\) 和 \(p_g\) 的联合分布。可以把 \(\gamma(x,y)\) 理解成运输计划：把真实分布某处的质量和生成分布某处的质量配对。Wasserstein 距离寻找总代价最小的运输计划。</p>
+          <p>直接优化这个定义很难。WGAN 使用 Kantorovich-Rubinstein duality，把它写成：</p>
+          <div class="equation">\[
+            W_1(p_{\mathrm{data}},p_g)
+            =
+            \sup_{\|f\|_L\leq 1}
+            \mathbb{E}_{x\sim p_{\mathrm{data}}}[f(x)]
+            -
+            \mathbb{E}_{x\sim p_g}[f(x)].
+          \]</div>
+          <p>这里 \(f\) 必须是 1-Lipschitz 函数。WGAN 用一个神经网络 critic \(f_\phi\) 来近似这个函数。注意它叫 critic，而不是 discriminator，因为它不再输出真假概率，也不使用 sigmoid。</p>
+          <p>WGAN 的 critic 目标是最大化：</p>
+          <div class="equation">\[
+            L_{\mathrm{critic}}
+            =
+            \mathbb{E}_{x\sim p_{\mathrm{data}}}[f_\phi(x)]
+            -
+            \mathbb{E}_{z\sim p_z}[f_\phi(G_\theta(z))].
+          \]</div>
+          <p>生成器则希望生成样本得到更高 critic 分数，所以最小化：</p>
+          <div class="equation">\[
+            L_G
+            =
+            -
+            \mathbb{E}_{z\sim p_z}
+            [f_\phi(G_\theta(z))].
+          \]</div>
+          <p>WGAN 的关键不是简单地“换了一个 loss”，而是把分布距离从 JS 换成 Wasserstein 距离，并要求 critic 满足 Lipschitz 约束。原始 WGAN 用 weight clipping 强行限制参数范围，但这会带来容量不足和优化问题。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>13. WGAN-GP：为什么要加梯度惩罚？</h2>
+          <p>WGAN-GP 改进了 WGAN 的 Lipschitz 约束方式。1-Lipschitz 的一个充分直观条件是函数对输入的梯度范数不要超过 1。WGAN-GP 不再粗暴裁剪权重，而是在真实样本和生成样本之间的插值点上惩罚梯度范数偏离 1：</p>
+          <div class="equation">\[
+            L_{\mathrm{GP}}
+            =
+            \lambda
+            \mathbb{E}_{\hat{x}}
+            \left[
+            \left(
+            \|\nabla_{\hat{x}}f_\phi(\hat{x})\|_2-1
+            \right)^2
+            \right].
+          \]</div>
+          <p>插值点通常构造为：</p>
+          <div class="equation">\[
+            \hat{x}
+            =
+            \epsilon x
+            +
+            (1-\epsilon)\tilde{x},
+            \qquad
+            \epsilon\sim U(0,1),
+          \]</div>
+          <p>其中 \(x\) 是真实样本，\(\tilde{x}=G(z)\) 是生成样本。完整 critic loss 常写成最小化形式：</p>
+          <div class="equation">\[
+            L_D
+            =
+            \mathbb{E}_{z\sim p_z}[f_\phi(G(z))]
+            -
+            \mathbb{E}_{x\sim p_{\mathrm{data}}}[f_\phi(x)]
+            +
+            L_{\mathrm{GP}}.
+          \]</div>
+          <p>梯度惩罚的动机很具体：critic 要提供平滑、有意义的分布距离信号，而不是靠极端参数或尖锐决策边界赢过生成器。WGAN-GP 使训练通常比 weight clipping 更稳定。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>13.5 还有哪些经典稳定化路线？</h2>
+          <p>GAN 的改进非常多，但如果按“它到底在修什么”来分类，会清楚很多。</p>
+          <h3>Improved Techniques for Training GANs</h3>
+          <p>Salimans 等人的 Improved Techniques for Training GANs 总结了一批早期非常有影响的训练技巧，比如 feature matching、minibatch discrimination、historical averaging、one-sided label smoothing 和 virtual batch normalization。</p>
+          <p><strong>feature matching</strong> 不直接让生成器只最大化判别器最终输出，而是让生成样本和真实样本在判别器中间层特征的均值接近：</p>
+          <div class="equation">\[
+            L_G
+            =
+            \left\|
+            \mathbb{E}_{x\sim p_{\mathrm{data}}}
+            f(x)
+            -
+            \mathbb{E}_{z\sim p_z}
+            f(G(z))
+            \right\|_2^2.
+          \]</div>
+          <p>这里 \(f(x)\) 是判别器某个中间层的特征。它的直觉是：不要只追逐判别器最后那一个真假分数，而是让生成样本在更稳定的特征统计上接近真实样本。</p>
+          <p><strong>minibatch discrimination</strong> 试图让判别器看到一个 batch 内样本之间的关系，从而发现生成器是否反复生成太相似的样本。这是针对模式崩溃的一个方向。</p>
+          <h3>Spectral Normalization</h3>
+          <p>Spectral Normalization GAN 用谱归一化约束判别器每一层的 Lipschitz 常数。对一个权重矩阵 \(W\)，谱归一化写成：</p>
+          <div class="equation">\[
+            \bar{W}
+            =
+            \frac{W}{\sigma(W)},
+          \]</div>
+          <p>其中 \(\sigma(W)\) 是最大奇异值。直觉上，这限制了该层对输入变化的放大能力，让判别器更平滑、更可控。它和 WGAN-GP 都在关心判别器/critic 的 Lipschitz 性，只是实现方式不同。</p>
+          <h3>TTUR 与 FID</h3>
+          <p>TTUR，也就是 Two Time-Scale Update Rule，研究的是生成器和判别器使用不同学习率时的收敛行为。GAN 是双网络博弈，两边学习速度一样并不总是最好。TTUR 的思想是允许两个网络在不同时间尺度上更新，从而改善训练动态。</p>
+          <p>同一篇工作还系统推广了 FID 作为生成模型评价指标。FID 的计算基于真实图像和生成图像在预训练网络特征空间中的高斯近似：</p>
+          <div class="equation">\[
+            \mathrm{FID}
+            =
+            \|\mu_r-\mu_g\|_2^2
+            +
+            \mathrm{Tr}
+            \left(
+            \Sigma_r+\Sigma_g
+            -
+            2(\Sigma_r\Sigma_g)^{1/2}
+            \right).
+          \]</div>
+          <p>这里 \((\mu_r,\Sigma_r)\) 来自真实图像特征，\((\mu_g,\Sigma_g)\) 来自生成图像特征。FID 越低，通常表示两组样本在特征空间统计上越接近。但它仍然不是完美指标，尤其会受数据量、特征网络和领域差异影响。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>14. 条件 GAN、Pix2Pix、CycleGAN：条件信息怎样进入生成过程？</h2>
+          <p>原始 GAN 从噪声 \(z\) 生成样本 \(x\)。如果我们希望控制生成内容，就需要加入条件 \(y\)。条件 GAN 写成：</p>
+          <div class="equation">\[
+            x=G(z,y),
+            \qquad
+            D(x,y).
+          \]</div>
+          <p>生成器根据噪声和条件生成样本；判别器不仅看样本是否真实，还看样本是否符合条件。目标可以写成：</p>
+          <div class="equation">\[
+            \min_G\max_D
+            \mathbb{E}_{x,y\sim p_{\mathrm{data}}}
+            [\log D(x,y)]
+            +
+            \mathbb{E}_{z\sim p_z,y\sim p(y)}
+            [\log(1-D(G(z,y),y))].
+          \]</div>
+          <p>Pix2Pix 可以看作图像到图像的条件 GAN：输入一张条件图，比如边缘图、语义分割图，输出目标图像。CycleGAN 进一步处理没有成对训练数据的场景，通过 cycle consistency 约束让从 A 到 B 再回到 A 的结果尽量保持原图内容。</p>
+          <p>这些模型的核心仍然没有离开 GAN 主线：判别器提供分布匹配信号，生成器学习一个能骗过判别器的条件生成分布。区别在于分布从 \(p(x)\) 变成了 \(p(x|y)\)，也就是“给定条件后，合理样本应该长什么样”。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>15. 评价 GAN：为什么不能只看几张好图？</h2>
+          <p>GAN 很容易给人一种错觉：只要挑几张漂亮样本，就说明模型很好。但生成模型评价必须同时看质量和多样性。</p>
+          <p><strong>样本质量</strong>问的是：单个生成样本是否清晰、自然、符合语义？</p>
+          <p><strong>多样性</strong>问的是：生成分布是否覆盖了真实分布的不同模式？有没有只生成少数类型？</p>
+          <p><strong>过拟合</strong>问的是：生成样本是不是只是复制训练集？如果一个模型生成的样本很真实，但其实是训练图像的近邻复制，它也不是好的生成模型。</p>
+          <p>常见指标包括 Inception Score 和 FID。Inception Score 希望生成图像既能被分类器高置信度识别，又在类别上有多样性。FID 则比较真实图像和生成图像在预训练网络特征空间中的均值和协方差差异。FID 更常用，但它仍然只是一个近似指标，依赖特征提取器和数据规模。</p>
+          <p>所以评价 GAN 时最好同时看：样本展示、随机批量样本、类别或属性覆盖、最近邻检查、FID 等指标，以及训练过程是否稳定。</p>
+        </section>
+
+        <section class="article-section">
+          <h2>16. 把 GAN 论文路线串起来</h2>
+          <p>读 GAN 相关论文时，可以按下面的路线抓重点。</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>论文/路线</th><th>应该抓住的问题</th><th>和本文的连接</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Generative Adversarial Nets</td><td>minimax 目标、最优判别器、JS 散度、非饱和损失。</td><td>第 2 节到第 6 节。</td></tr>
+                <tr><td>DCGAN</td><td>哪些卷积结构和归一化技巧让图像 GAN 更稳定？</td><td>第 10 节。</td></tr>
+                <tr><td>LSGAN</td><td>为什么最小二乘损失可以缓解某些梯度问题？</td><td>第 11 节。</td></tr>
+                <tr><td>WGAN</td><td>为什么 Wasserstein 距离比 JS 散度更适合某些支撑不重叠场景？critic 和 discriminator 有什么区别？</td><td>第 12 节。</td></tr>
+                <tr><td>WGAN-GP</td><td>为什么 Lipschitz 约束重要？gradient penalty 比 weight clipping 改进在哪里？</td><td>第 13 节。</td></tr>
+                <tr><td>Conditional GAN / Pix2Pix / CycleGAN</td><td>条件信息如何改变生成分布？配对数据和非配对数据分别需要什么约束？</td><td>第 14 节。</td></tr>
+                <tr><td>StyleGAN / BigGAN</td><td>如何通过架构、归一化、潜空间设计和大规模训练提高图像质量？</td><td>建立在第 7 节、第 10 节和第 15 节。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="article-section">
+          <h2>17. 多轮自检：这篇 GAN 是否真的讲清楚了？</h2>
+          <p>下面仍然按初学者视角做多轮检查。不是为了把问答放在文章末尾凑长度，而是帮助读者发现自己哪里还没有真正理解，并知道应该回到哪一节。</p>
+          <h3>第一轮：定义和目标有没有清楚？</h3>
+          <p><strong>检查一：你能否解释为什么 GAN 也是在拟合分布？</strong>答案应该提到：噪声 \(z\) 经过生成器诱导出 \(p_g\)，GAN 的目标是让 \(p_g\) 接近 \(p_{\mathrm{data}}\)。卡住时回到第 0 节。</p>
+          <p><strong>检查二：你能否解释为什么 GAN 叫隐式生成模型？</strong>它能采样，但不一定能写出或计算 \(p_g(x)\) 的显式密度。卡住时回到第 0 节和第 1 节。</p>
+          <p><strong>检查三：你能否解释生成器和判别器分别优化什么？</strong>判别器要分开真实和生成样本，生成器要让生成样本被判成真实。卡住时回到第 1 节和第 2 节。</p>
+          <h3>第二轮：核心推导有没有过关？</h3>
+          <p><strong>检查四：你能否独立推导最优判别器？</strong>应该能从 \(a\log y+b\log(1-y)\) 求导，得到 \(D_G^*(x)=p_{\mathrm{data}}(x)/(p_{\mathrm{data}}(x)+p_g(x))\)。卡住时回到第 3 节。</p>
+          <p><strong>检查五：你能否解释 JS 散度从哪里来？</strong>应该能把 \(D_G^*\) 代回目标，引入 \(m=(p_{\mathrm{data}}+p_g)/2\)，再整理成 \(-\log4+2D_{\mathrm{JS}}\)。卡住时回到第 4 节。</p>
+          <p><strong>检查六：你能否解释为什么 \(D=1/2\) 是理想状态？</strong>因为当 \(p_g=p_{\mathrm{data}}\) 时，最优判别器无法区分真假样本，只能给出 \(1/2\)。卡住时回到第 3 节。</p>
+          <h3>第三轮：训练问题有没有理解？</h3>
+          <p><strong>检查七：你能否解释非饱和损失为什么常用？</strong>它和 minimax 有相同理想目标，但在训练早期能给生成器更强梯度。卡住时回到第 6 节。</p>
+          <p><strong>检查八：你能否解释模式崩溃？</strong>它不是单张图不好，而是生成分布没有覆盖真实分布的多个模式。卡住时回到第 9 节和第 15 节。</p>
+          <p><strong>检查九：你能否解释 GAN 为什么比普通监督学习更不稳定？</strong>因为它是双网络博弈，目标函数本身随对手变化，训练可能震荡或一方过强。卡住时回到第 5 节和第 7 节。</p>
+          <p><strong>检查十：你能否解释为什么代码里更新判别器时要 detach 假样本？</strong>因为这一步只优化判别器参数，生成器参数应当固定。卡住时回到第 7.5 节。</p>
+          <h3>第四轮：能不能读后续论文？</h3>
+          <p><strong>检查十一：你能否说明 DCGAN 改的是目标还是架构？</strong>主要改的是生成器和判别器的卷积架构，原始对抗目标主线不变。卡住时回到第 10 节。</p>
+          <p><strong>检查十二：你能否说明 WGAN 为什么不用 sigmoid 判别器？</strong>WGAN 的 critic 不是输出真假概率，而是近似 Kantorovich-Rubinstein dual 中的 1-Lipschitz 函数。卡住时回到第 12 节。</p>
+          <p><strong>检查十三：你能否解释 WGAN-GP 的梯度惩罚在约束什么？</strong>它约束 critic 对输入的梯度范数，帮助满足 Lipschitz 条件。卡住时回到第 13 节。</p>
+          <p><strong>检查十四：你能否解释 spectral normalization、feature matching 和 TTUR 分别在修什么？</strong>spectral normalization 约束判别器平滑性，feature matching 改生成器训练信号，TTUR 调整双网络学习速度。卡住时回到第 13.5 节。</p>
+          <p>如果这十四个问题都能顺畅回答，说明你已经掌握 GAN 的核心理论：它如何把分布比较变成二分类博弈，为什么最优判别器导向 JS 散度，为什么实际训练要改损失和架构，以及 WGAN 为什么要换成 Wasserstein 距离。之后读 GAN、DCGAN、LSGAN、WGAN、WGAN-GP、Pix2Pix、CycleGAN、StyleGAN 等论文时，就能知道每篇是在改目标、改距离、改约束、改架构，还是改条件建模方式。</p>
+        </section>
+
+        <section class="article-section references">
+          <h2>参考资料</h2>
+          <ul>
+            <li><a href="https://arxiv.org/abs/1406.2661" target="_blank" rel="noreferrer">Goodfellow et al., Generative Adversarial Nets, 2014</a></li>
+            <li><a href="https://arxiv.org/abs/1511.06434" target="_blank" rel="noreferrer">Radford, Metz, Chintala, Unsupervised Representation Learning with Deep Convolutional Generative Adversarial Networks, 2015</a></li>
+            <li><a href="https://arxiv.org/abs/1611.04076" target="_blank" rel="noreferrer">Mao et al., Least Squares Generative Adversarial Networks, 2016</a></li>
+            <li><a href="https://arxiv.org/abs/1701.07875" target="_blank" rel="noreferrer">Arjovsky, Chintala, Bottou, Wasserstein GAN, 2017</a></li>
+            <li><a href="https://arxiv.org/abs/1704.00028" target="_blank" rel="noreferrer">Gulrajani et al., Improved Training of Wasserstein GANs, 2017</a></li>
+            <li><a href="https://arxiv.org/abs/1606.03498" target="_blank" rel="noreferrer">Salimans et al., Improved Techniques for Training GANs, 2016</a></li>
+            <li><a href="https://arxiv.org/abs/1802.05957" target="_blank" rel="noreferrer">Miyato et al., Spectral Normalization for Generative Adversarial Networks, 2018</a></li>
+            <li><a href="https://arxiv.org/abs/1706.08500" target="_blank" rel="noreferrer">Heusel et al., GANs Trained by a Two Time-Scale Update Rule Converge to a Local Nash Equilibrium, 2017</a></li>
+            <li><a href="https://arxiv.org/abs/1411.1784" target="_blank" rel="noreferrer">Mirza and Osindero, Conditional Generative Adversarial Nets, 2014</a></li>
+            <li><a href="https://arxiv.org/abs/1611.07004" target="_blank" rel="noreferrer">Isola et al., Image-to-Image Translation with Conditional Adversarial Networks, 2016</a></li>
+            <li><a href="https://arxiv.org/abs/1703.10593" target="_blank" rel="noreferrer">Zhu et al., Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks, 2017</a></li>
+            <li><a href="https://arxiv.org/abs/1701.00160" target="_blank" rel="noreferrer">Goodfellow, NIPS 2016 Tutorial: Generative Adversarial Networks</a></li>
+            <li><a href="https://developers.google.com/machine-learning/gan" target="_blank" rel="noreferrer">Google Developers, Generative Adversarial Networks</a></li>
+            <li><a href="https://lilianweng.github.io/posts/2017-08-20-gan/" target="_blank" rel="noreferrer">Lilian Weng, From GAN to WGAN</a></li>
+            <li><a href="https://cs.stanford.edu/people/karpathy/gan/" target="_blank" rel="noreferrer">Andrej Karpathy, GAN demo</a></li>
+            <li><a href="https://www.mindspore.cn/tutorials/en/master/generative/gan.html" target="_blank" rel="noreferrer">MindSpore Tutorial, Generative Adversarial Network</a></li>
+          </ul>
+        </section>
+      `,
+    },
+    {
       slug: "vae-foundations",
       title: "VAE 基础理论：从潜变量模型到 ELBO、重参数化与生成",
       date: "2026-05-23",
@@ -2417,6 +3124,7 @@ window.siteContent = {
     },
   ],
   tags: [
+    "GAN",
     "VAE",
     "Diffusion Model",
     "Generative Model",
@@ -2424,6 +3132,11 @@ window.siteContent = {
     "Probability",
     "Maximum Likelihood",
     "KL Divergence",
+    "JS Divergence",
+    "Adversarial Training",
+    "Wasserstein Distance",
+    "DCGAN",
+    "WGAN",
     "Variational Inference",
     "ELBO",
     "Latent Variable Model",
@@ -2433,5 +3146,5 @@ window.siteContent = {
     "SDE",
     "ODE"
   ],
-  categories: [{ name: "学习笔记", count: 3 }],
+  categories: [{ name: "学习笔记", count: 4 }],
 };
