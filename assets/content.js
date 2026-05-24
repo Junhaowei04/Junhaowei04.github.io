@@ -2499,6 +2499,58 @@ window.siteContent = {
             </table>
           </div>
           <p>这样看，现代生成模型不是一堆孤立技巧，而是一组围绕同一目标的不同选择：有的选择显式密度，有的选择隐式分布匹配；有的引入潜变量，有的引入可逆变换，有的引入噪声路径或速度场。读论文时只要抓住“它在怎样让 \(p_\theta\) 接近 \(p_{\mathrm{data}}\)”这个问题，就不会被符号淹没。</p>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 520" role="img" aria-label="生成模型不同路线如何围绕分布拟合目标展开的总览图">
+              <defs>
+                <linearGradient id="gen-map-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.74"></stop>
+                </linearGradient>
+                <marker id="gen-map-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="420" fill="url(#gen-map-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">生成模型路线图：都在回答同一个分布拟合问题</text>
+              <text class="label-small" x="52" y="98">核心目标不是“会画图”，而是让模型分布 p_theta 接近真实数据分布 p_data，并且训练后能采样。</text>
+
+              <rect x="348" y="128" width="284" height="78" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="388" y="158">共同目标</text>
+              <text class="label-small" x="374" y="184">p_theta(x)  接近  p_data(x)</text>
+
+              <rect x="70" y="270" width="174" height="86" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="100" y="300">显式密度</text>
+              <text class="label-small" x="92" y="324">直接算 log p_theta(x)</text>
+              <text class="label-small label-blue" x="100" y="348">MLE / NLL / KL</text>
+
+              <rect x="288" y="270" width="174" height="86" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="320" y="300">潜变量下界</text>
+              <text class="label-small" x="314" y="324">p(x)=∫p(x|z)p(z)dz</text>
+              <text class="label-small label-blue" x="326" y="348">ELBO / VAE</text>
+
+              <rect x="506" y="270" width="174" height="86" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="536" y="300">隐式分布匹配</text>
+              <text class="label-small" x="532" y="324">能采样但密度难写</text>
+              <text class="label-small label-blue" x="548" y="348">GAN / critic</text>
+
+              <rect x="724" y="270" width="184" height="86" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="754" y="300">路径与速度场</text>
+              <text class="label-small" x="746" y="324">从简单分布运输到数据</text>
+              <text class="label-small label-blue" x="748" y="348">Diffusion / Flow Matching</text>
+
+              <path d="M 418 206 L 168 260" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gen-map-arrow)"></path>
+              <path d="M 460 206 L 382 260" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gen-map-arrow)"></path>
+              <path d="M 526 206 L 584 260" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gen-map-arrow)"></path>
+              <path d="M 564 206 L 808 260" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gen-map-arrow)"></path>
+
+              <text class="label-small" x="84" y="398">Flow / Autoregressive：密度可算，训练目标最直接</text>
+              <text class="label-small" x="306" y="398">VAE：真实似然难算，用下界替代</text>
+              <text class="label-small" x="512" y="398">GAN：不用显式似然，用判别信号比较分布</text>
+              <text class="label-small" x="722" y="398">Diffusion / FM：学习从噪声到数据的方向</text>
+            </svg>
+            <figcaption>自绘图：不同生成模型路线可以先按“能不能显式计算密度、是否引入潜变量、训练信号来自哪里、采样路径怎样走”来区分。显式密度模型直接最大似然；VAE 用 ELBO 绕开潜变量积分；GAN 用判别器间接比较分布；Diffusion 和 Flow Matching 把生成看成从简单分布到数据分布的逐步运输。</figcaption>
+          </figure>
         </section>
 
         <section class="article-section">
@@ -2557,7 +2609,7 @@ window.siteContent = {
           <p><strong>问题十：这篇文章和下一篇 Diffusion 有什么关系？</strong>Diffusion 也是生成模型，所以它仍然要学习 \(p_{\mathrm{data}}(x)\)。区别在于它不直接写出一个简单的 \(p_\theta(x)\)，而是构造一条从数据到噪声、再从噪声回到数据的路径。理解了本文的分布、似然、KL、采样之后，再看 Diffusion 的前向加噪、反向去噪、ELBO 和 score，就会知道它们不是孤立技巧，而是在服务同一个目标：让模型分布接近真实数据分布。卡住时回到第 10 节，然后进入下一篇。</p>
 
           <h3>第四轮：能不能接上开山论文？</h3>
-          <p><strong>问题十一：为什么读 VAE、GAN、Flow、Diffusion 的开山论文之前，必须先懂“分布拟合”？</strong>因为这些论文表面上改的是网络结构或训练技巧，背后都在处理同一个问题：怎样表示、训练并采样一个接近真实数据分布的 \(p_\theta(x)\)。如果这个主线不清楚，ELBO、对抗损失、变量替换公式、去噪 MSE、速度场回归都会变成孤立公式。卡住时回到第 4 节、第 7 节和第 10.5 节。</p>
+          <p><strong>问题十一：为什么读 VAE、GAN、Flow、Diffusion 的开山论文之前，必须先懂“分布拟合”？</strong>因为这些论文表面上改的是网络结构或训练技巧，背后都在处理同一个问题：怎样表示、训练并采样一个接近真实数据分布的 \(p_\theta(x)\)。如果这个主线不清楚，ELBO、对抗损失、变量替换公式、去噪 MSE、速度场回归都会变成孤立公式。读的时候可以先把论文放到四类路线中：显式密度、潜变量下界、隐式分布匹配、路径/速度场。卡住时回到第 4 节、第 7 节和第 10.5 节。</p>
           <p><strong>问题十二：为什么有些模型能算似然，有些模型不能精确算似然，却仍然都叫生成模型？</strong>生成模型的定义不是“必须能精确算 \(p_\theta(x)\)”，而是“能够刻画数据分布并从中生成样本”。Flow 和 autoregressive model 通常能精确或近似计算似然；VAE 用 ELBO 近似；GAN 常用隐式分布匹配；Diffusion 通过多步去噪和变分目标学习采样路径。卡住时回到第 8 节、第 10 节和第 10.5 节。</p>
         </section>
 
