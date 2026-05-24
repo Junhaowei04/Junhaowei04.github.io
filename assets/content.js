@@ -1038,6 +1038,44 @@ window.siteContent = {
             \mathcal{L}(\theta,\phi;x).
           \]</div>
           <p>这个 \(\mathcal{L}\) 就是 ELBO，Evidence Lower Bound，也就是边缘对数似然的下界。最大化 ELBO 有两层含义：一方面提高数据似然的下界，另一方面让近似后验 \(q_\phi(z|x)\) 接近真实后验 \(p_\theta(z|x)\)。</p>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="ELBO 是 log likelihood 的下界，并且差距是真实后验和近似后验的 KL 散度">
+              <defs>
+                <linearGradient id="vae-elbo-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="vae-elbo-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="338" fill="url(#vae-elbo-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="68">ELBO 为什么叫 lower bound？</text>
+              <text class="label-small" x="52" y="94">真实目标 log pθ(x) 难算，但可以优化一个可计算下界；下界和真实目标之间的 gap 是一个非负 KL。</text>
+
+              <line class="axis" x1="96" y1="306" x2="500" y2="306"></line>
+              <line class="axis" x1="96" y1="306" x2="96" y2="124"></line>
+              <rect x="152" y="132" width="96" height="174" fill="#d9ecf9" stroke="#8fc5ec"></rect>
+              <rect x="336" y="186" width="96" height="120" fill="#ffe4d7" stroke="#ffb899"></rect>
+              <line class="guide" x1="120" y1="132" x2="478" y2="132"></line>
+              <line class="guide" x1="120" y1="186" x2="478" y2="186"></line>
+              <path d="M 454 186 L 454 132" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-elbo-arrow)"></path>
+              <text class="label-small label-blue" x="138" y="326">log pθ(x)</text>
+              <text class="label-small label-orange" x="330" y="326">ELBO L</text>
+              <text class="label-small" x="462" y="160">gap</text>
+              <text class="label-small" x="442" y="180">KL(qφ(z|x) || pθ(z|x))</text>
+
+              <rect x="574" y="122" width="300" height="184" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="606" y="158">ELBO 本身由两部分组成</text>
+              <text class="label-small" x="606" y="194">1. 重建项：z 是否能解释 x</text>
+              <text class="label-small" x="606" y="226">2. KL 正则：qφ(z|x) 是否接近 p(z)</text>
+              <line class="axis" x1="606" y1="248" x2="842" y2="248"></line>
+              <text class="label-small" x="606" y="278">最大化 ELBO 同时在做两件事：</text>
+              <text class="label-small" x="606" y="302">提高下界，并缩小后验近似误差。</text>
+            </svg>
+            <figcaption>自绘图：KL 分解可以读成 \(\log p_\theta(x)=\mathrm{ELBO}+D_{\mathrm{KL}}(q_\phi(z|x)\|p_\theta(z|x))\)。因为右边第二项非负，所以 ELBO 一定不超过真实 log likelihood；训练时最大化 ELBO，就是在提高一个可计算的下界，并间接逼近真实后验。</figcaption>
+          </figure>
         </section>
 
         <section class="article-section">
@@ -1243,6 +1281,50 @@ window.siteContent = {
             z=\mu_\phi(x)+\sigma_\phi(x)\odot\epsilon.
           \]</div>
 
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="VAE 重参数化技巧把随机采样改写成固定噪声和可微变换">
+              <defs>
+                <linearGradient id="vae-reparam-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="vae-reparam-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="338" fill="url(#vae-reparam-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="68">重参数化：把“随机节点”改成“固定噪声 + 可微变换”</text>
+              <text class="label-small" x="52" y="94">直接采 z 会让梯度难以穿过采样操作；改写成 z = μ + σ ⊙ ε 后，随机性与网络参数分离。</text>
+
+              <rect x="76" y="142" width="146" height="78" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="126" y="174">x</text>
+              <text class="label-small" x="104" y="198">输入样本</text>
+              <path d="M 222 181 L 314 181" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-reparam-arrow)"></path>
+              <rect x="328" y="122" width="172" height="118" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="370" y="156">encoder</text>
+              <text class="label-small" x="360" y="186">输出 μφ(x)</text>
+              <text class="label-small" x="360" y="210">输出 σφ(x)</text>
+
+              <rect x="328" y="274" width="172" height="64" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="392" y="304">ε</text>
+              <text class="label-small" x="356" y="326">标准高斯噪声</text>
+              <path d="M 500 181 L 592 181" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-reparam-arrow)"></path>
+              <path d="M 500 306 C 538 292, 558 250, 592 214" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-reparam-arrow)"></path>
+              <rect x="606" y="142" width="152" height="102" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="642" y="174">z = μ + σ ⊙ ε</text>
+              <text class="label-small" x="634" y="204">可微变换</text>
+              <text class="label-small" x="634" y="226">梯度可以穿过</text>
+              <path d="M 758 193 L 840 193" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-reparam-arrow)"></path>
+              <rect x="852" y="142" width="80" height="102" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="870" y="176">decoder</text>
+              <text class="label-small" x="868" y="208">重建 x</text>
+
+              <path d="M 882 254 C 782 338, 496 370, 404 250" fill="none" stroke="#16a394" stroke-width="2.2" marker-end="url(#vae-reparam-arrow)"></path>
+              <text class="label-small" x="548" y="354">反向传播路径：decoder loss → z → μ, σ → encoder</text>
+            </svg>
+            <figcaption>自绘图：重参数化技巧的关键不是“换一种采样写法”这么简单，而是把随机性固定到 \(\epsilon\) 上，让 \(z\) 成为 \(\mu_\phi(x)\)、\(\sigma_\phi(x)\) 的可微函数。这样 reconstruction loss 和 KL loss 的梯度才能稳定地更新 encoder。</figcaption>
+          </figure>
+
           <figure class="source-figure">
             <img src="https://lilianweng.github.io/posts/2018-08-12-vae/vae-gaussian.png" alt="高斯 VAE 架构与重参数化" loading="lazy" />
             <figcaption>参考图：高斯 VAE 中 encoder 输出 \(\mu\) 和 \(\sigma\)，通过重参数化采样 \(z\)，再由 decoder 重建 \(x\)。图片来源：Lilian Weng, From Autoencoder to Beta-VAE。</figcaption>
@@ -1252,6 +1334,7 @@ window.siteContent = {
         <section class="article-section">
           <h2>9.5 开山论文到底贡献了什么？SGVB 与 AEVB</h2>
           <p>Kingma 和 Welling 的 Auto-Encoding Variational Bayes 之所以是 VAE 开山之作，不只是因为它写出了 ELBO。ELBO 在变分推断里早就存在。真正关键的是：他们把神经网络生成模型、摊销推断、重参数化技巧和随机梯度优化组合成一个可训练框架。</p>
+          <div class="paper-note">读 AEVB 原文时，不要只找“VAE 结构图”。更重要的是看它把三件事接成了一个训练算法：用 recognition model \(q_\phi(z|x)\) 摊销后验推断；用 reparameterization trick 得到低方差 pathwise gradient；用 minibatch SGVB estimator 近似全数据 ELBO。把这三件事连起来，才是这篇开山论文的核心。</div>
           <p>论文里常见几个术语，读的时候要对上。</p>
           <ol>
             <li><strong>recognition model。</strong>就是我们文章里说的 encoder 或 inference network，记作 \(q_\phi(z|x)\)。它负责从数据 \(x\) 近似推断潜变量 \(z\)。</li>
