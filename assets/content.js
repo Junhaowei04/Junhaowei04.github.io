@@ -1431,7 +1431,67 @@ window.siteContent = {
             \sum_{i=1}^{M}
             \widetilde{\mathcal{L}}(\theta,\phi;x^{(i)}).
           \]</div>
+          <p>这里的 \(N/M\) 不是神秘修正项。全数据目标本来是 \(N\) 个样本 ELBO 的和，但每次训练只看 \(M\) 个样本，所以 minibatch 的和要乘上 \(N/M\)，才能成为全数据和的无偏估计。如果代码里优化的是“平均每个样本的 loss”，这个常数经常会被省略，因为它只会整体缩放梯度，可以被学习率吸收。</p>
           <p>这就是 VAE 能在大数据和深度网络上训练的关键：不需要对每个数据点做昂贵的局部变分优化，也不需要精确计算边缘似然。每次只取一个 minibatch，用 encoder 给出 \(q_\phi(z|x)\)，重参数化采样 \(z\)，decoder 计算重建概率，再加上 KL 闭式项，就能用反向传播更新参数。</p>
+          <p>和传统变分推断相比，AEVB 的另一个核心变化是“摊销”。传统做法可能给每个样本 \(x^{(i)}\) 单独维护一组变分参数 \(\lambda_i\)，每来一个新样本都要重新优化；AEVB 用一个共享的 recognition network \(q_\phi(z|x)\) 直接输出该样本的后验参数。也就是说，推断本身被神经网络学成了一个函数。</p>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 520" role="img" aria-label="AEVB 算法把摊销推断、重参数化、ELBO 估计和随机梯度更新连接起来的流程图">
+              <defs>
+                <linearGradient id="vae-aevb-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.74"></stop>
+                </linearGradient>
+                <marker id="vae-aevb-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="420" fill="url(#vae-aevb-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">AEVB 每个 minibatch 到底做什么？</text>
+              <text class="label-small" x="52" y="98">开山论文的核心不是多画一个 encoder-decoder，而是让后验推断、采样估计和梯度更新变成同一条可训练流水线。</text>
+
+              <rect x="58" y="142" width="134" height="70" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="88" y="170">minibatch</text>
+              <text class="label-small" x="82" y="194">x^(1),...,x^(M)</text>
+              <path d="M 192 177 L 240 177" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-aevb-arrow)"></path>
+
+              <rect x="254" y="142" width="160" height="70" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="286" y="170">recognition</text>
+              <text class="label-small" x="276" y="194">q_phi(z|x) -> mu, sigma</text>
+              <path d="M 414 177 L 462 177" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-aevb-arrow)"></path>
+
+              <rect x="476" y="142" width="156" height="70" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="506" y="170">sample eps</text>
+              <text class="label-small" x="496" y="194">z = mu + sigma * eps</text>
+              <path d="M 632 177 L 680 177" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-aevb-arrow)"></path>
+
+              <rect x="694" y="142" width="162" height="70" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="732" y="170">generative</text>
+              <text class="label-small" x="714" y="194">p_theta(x|z)</text>
+
+              <path d="M 776 212 C 776 250, 710 258, 710 292" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-aevb-arrow)"></path>
+              <path d="M 336 212 C 336 250, 438 258, 438 292" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-aevb-arrow)"></path>
+
+              <rect x="338" y="292" width="202" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="374" y="322">closed-form KL</text>
+              <text class="label-small" x="360" y="346">D_KL(q_phi(z|x) || p(z))</text>
+
+              <rect x="608" y="292" width="204" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="648" y="322">reconstruction</text>
+              <text class="label-small" x="632" y="346">log p_theta(x|z)</text>
+
+              <path d="M 540 330 L 588 330" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-aevb-arrow)"></path>
+              <path d="M 710 368 C 710 394, 588 398, 490 398" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-aevb-arrow)"></path>
+
+              <rect x="214" y="384" width="276" height="54" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="246" y="416">SGVB estimate of ELBO</text>
+              <path d="M 214 411 L 148 411 C 116 411, 116 222, 124 212" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-aevb-arrow)"></path>
+              <text class="label-small label-orange" x="536" y="406">backprop updates theta and phi</text>
+              <text class="label-small label-blue" x="58" y="406">repeat with new minibatch</text>
+            </svg>
+            <figcaption>自绘图：AEVB 把每个 minibatch 的训练变成一条可反向传播的路径。encoder 摊销地输出 \(q_\phi(z|x)\) 的参数；重参数化把随机性移到 \(\epsilon\)；decoder 给出重建对数概率；KL 项通常有闭式；二者合成 SGVB 估计器，再用随机梯度同时更新 \(\theta\) 和 \(\phi\)。</figcaption>
+          </figure>
+
           <div class="insight-box">读开山论文时，可以把 AEVB 理解成一句话：用一个 recognition network 产生近似后验，用重参数化得到低方差梯度，用随机梯度最大化 ELBO。</div>
         </section>
 
@@ -1795,7 +1855,7 @@ window.siteContent = {
 
           <h3>第三轮：训练和代码能否对应？</h3>
           <p><strong>检查七：你能否解释重参数化技巧为什么必要？</strong>它把 \(z\sim q_\phi(z|x)\) 改写成 \(z=\mu_\phi(x)+\sigma_\phi(x)\odot\epsilon\)，让随机性来自不依赖参数的 \(\epsilon\)，梯度可以穿过 \(\mu,\sigma\)。卡住时回到第 9 节。</p>
-          <p><strong>检查八：你能否解释开山论文里的 SGVB estimator 和 AEVB algorithm？</strong>SGVB 是重参数化后的随机梯度 ELBO 估计器，AEVB 是把这个估计器用于 recognition model 和 generative model 的端到端训练算法。卡住时回到第 9.5 节。</p>
+          <p><strong>检查八：你能否解释开山论文里的 SGVB estimator 和 AEVB algorithm？</strong>SGVB 是重参数化后的随机梯度 ELBO 估计器，AEVB 是把这个估计器用于 recognition model 和 generative model 的端到端训练算法。最好还能说清楚 minibatch 估计里的 \(N/M\) 从哪里来，以及为什么代码里有时会省略这个常数。卡住时回到第 9.5 节。</p>
           <p><strong>检查九：你能否解释为什么 pathwise gradient 通常比 score-function estimator 更适合高斯 VAE？</strong>前者让梯度穿过可微采样路径，利用 \(f(z)\) 对 \(z\) 的局部导数；后者更通用但常常方差更大。卡住时回到第 9.6 节。</p>
           <p><strong>检查十：你能否解释 reconstruction loss 为什么有时是 BCE、有时是 MSE？</strong>它取决于 decoder likelihood。Bernoulli likelihood 对应 BCE，固定方差 Gaussian likelihood 对应 MSE。卡住时回到第 8 节。</p>
           <p><strong>检查十一：你能否把代码里的 KL 公式和数学 KL 对上？</strong>代码常用 \(-\frac{1}{2}\sum(1+\mathrm{logvar}-\mu^2-\exp(\mathrm{logvar}))\)，它就是高斯 KL 闭式的 log variance 写法。卡住时回到第 10 节和第 11 节。</p>
