@@ -493,7 +493,7 @@ button {
 
 .equation {
   display: block;
-  overflow-x: auto;
+  overflow-x: visible;
   margin: 14px 0 18px;
   padding: 2px 0 4px;
   color: #26394f;
@@ -508,7 +508,13 @@ button {
 
 .equation mjx-container {
   margin: 0 !important;
-  min-width: max-content;
+  max-width: none;
+  min-width: 0;
+}
+
+.equation mjx-container svg {
+  max-width: 100%;
+  height: auto;
 }
 
 .source-figure {
