@@ -323,6 +323,49 @@ window.siteContent = {
             \log2.
           \]</div>
           <p>也就是说，只要两个分布不重叠，不管它们距离是 1 还是 100，JS 散度都可能达到同一个饱和值。对生成器来说，这个数没有告诉它“向左移动一点会更好”。Wasserstein 距离的直觉优势就在这里：如果生成分布从 10 移到 9，虽然还没和真实分布重叠，但运输距离已经变小，目标可以给出更连续的改进信号。</p>
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 470" role="img" aria-label="JS 散度饱和与 Wasserstein 距离连续变化的直观对比图">
+              <defs>
+                <linearGradient id="gan-distance-bg" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.72"></stop>
+                </linearGradient>
+                <marker id="gan-distance-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="382" fill="url(#gan-distance-bg)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">为什么支撑不重叠时 JS 容易“看不见距离”？</text>
+              <text class="label-small" x="52" y="98">同样是两个还没相交的分布，JS 可能都接近饱和值；Wasserstein 会随着它们的空间距离变短而变小。</text>
+
+              <line class="axis" x1="82" y1="250" x2="430" y2="250"></line>
+              <path class="curve-real" d="M 100 250 C 128 248, 138 130, 166 130 C 194 130, 204 248, 232 250"></path>
+              <path class="curve-model" d="M 278 250 C 306 248, 316 130, 344 130 C 372 130, 382 248, 410 250"></path>
+              <line class="guide" x1="166" y1="250" x2="166" y2="122"></line>
+              <line class="guide" x1="344" y1="250" x2="344" y2="122"></line>
+              <path d="M 180 270 L 330 270" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-distance-arrow)"></path>
+              <text class="label-small label-blue" x="112" y="284">p_data</text>
+              <text class="label-small label-orange" x="300" y="284">p_g 还很远</text>
+              <text class="label-small" x="178" y="304">W1 大，仍然知道“要搬多远”</text>
+              <text class="label-small" x="112" y="344">JS：支撑不重叠，接近 log 2</text>
+
+              <line class="axis" x1="550" y1="250" x2="900" y2="250"></line>
+              <path class="curve-real" d="M 568 250 C 596 248, 606 130, 634 130 C 662 130, 672 248, 700 250"></path>
+              <path class="curve-model" d="M 754 250 C 782 248, 792 130, 820 130 C 848 130, 858 248, 886 250"></path>
+              <line class="guide" x1="634" y1="250" x2="634" y2="122"></line>
+              <line class="guide" x1="820" y1="250" x2="820" y2="122"></line>
+              <path d="M 648 270 L 806 270" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-distance-arrow)"></path>
+              <text class="label-small label-blue" x="580" y="284">p_data</text>
+              <text class="label-small label-orange" x="776" y="284">p_g 近一点</text>
+              <text class="label-small" x="646" y="304">W1 变小，训练信号连续变好</text>
+              <text class="label-small" x="580" y="344">JS：仍不重叠，数值可能仍饱和</text>
+
+              <path class="curve-soft" d="M 466 112 C 482 150, 498 192, 514 250"></path>
+              <text class="label-small" x="448" y="90">生成器移动一点</text>
+              <text class="label-small" x="410" y="384">核心区别：JS 更像“能不能分开”，Wasserstein 更像“还要搬多远”。</text>
+            </svg>
+            <figcaption>自绘图：在两个分布的支撑完全不重叠时，最优判别器可以轻松分开真假样本，JS 散度容易达到饱和；但 Wasserstein 距离仍然记录两个分布之间的运输距离。因此 WGAN 的 critic 不是输出真假概率，而是在 Lipschitz 约束下估计一个更连续的分布差异信号。</figcaption>
+          </figure>
           <div class="insight-box">这就是为什么 WGAN 不是简单追求一个更时髦的 loss。它试图解决的是：当分布还离得很远时，训练信号是否仍然能告诉生成器往哪里走。</div>
         </section>
 
