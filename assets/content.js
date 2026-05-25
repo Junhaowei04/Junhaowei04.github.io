@@ -806,6 +806,73 @@ window.siteContent = {
             \mathbb{E}_{x\sim p_g}[f(x)].
           \]</div>
           <p>这里 \(f\) 必须是 1-Lipschitz 函数。WGAN 用一个神经网络 critic \(f_\phi\) 来近似这个函数。注意它叫 critic，而不是 discriminator，因为它不再输出真假概率，也不使用 sigmoid。</p>
+          <p>这一步非常关键，值得慢一点拆开。原始 GAN 的判别器 \(D(x)\) 是一个二分类概率：它回答“这个样本像不像真实样本”。WGAN 的 critic \(f(x)\) 不是概率，而是一个标量势函数：它给真实样本高分、给生成样本低分，两者期望差越大，说明当前两类分布在 critic 看来距离越远。1-Lipschitz 约束的作用是防止 critic 通过把函数值任意拉大来作弊；它要求输入移动一点，函数值最多也只能按比例变化。</p>
+          <p>可以用一个最小例子看出 WGAN 论文的核心动机。假设真实分布是一个点质量：</p>
+          <div class="equation">\[
+            p_{\mathrm{data}}=\delta_0,
+            \qquad
+            p_g=\delta_\theta.
+          \]</div>
+          <p>也就是说，真实样本永远在 0，生成器当前永远生成 \(\theta\)。当 \(\theta\neq 0\) 时，两个分布支撑不重叠。此时最优判别器可以完美区分真假样本，所以 JS 散度直接饱和：</p>
+          <div class="equation">\[
+            D_{\mathrm{JS}}(\delta_0\|\delta_\theta)=\log 2,
+            \qquad \theta\neq 0.
+          \]</div>
+          <p>问题是：\(\theta=10\) 和 \(\theta=1\) 都是不重叠，但显然 \(\theta=1\) 更接近真实数据。JS 散度在这里看不出这种“靠近”。Wasserstein-1 距离却能看出来，因为把 \(\delta_\theta\) 的质量搬到 0 只需要移动 \(|\theta|\) 的距离：</p>
+          <div class="equation">\[
+            W_1(\delta_0,\delta_\theta)=|\theta|.
+          \]</div>
+          <p>用 KR 对偶也能得到同样结论。若 \(\theta>0\)，选择 \(f(x)=-x\)，它是 1-Lipschitz，并且：</p>
+          <div class="equation">\[
+            \mathbb{E}_{x\sim\delta_0}[f(x)]
+            -
+            \mathbb{E}_{x\sim\delta_\theta}[f(x)]
+            =
+            f(0)-f(\theta)
+            =
+            0-(-\theta)
+            =
+            \theta.
+          \]</div>
+          <p>由于 1-Lipschitz 函数最多只能让两个点的函数值差达到它们的距离，所以这个下界已经达到上确界，于是 \(W_1=\theta\)。这说明 critic 真正在学的是“沿什么方向移动会让生成分布更接近真实分布”。在这个例子里，生成器最小化 \(W_1=|\theta|\)，自然会把 \(\theta\) 往 0 推；而 JS 饱和时看不出 \(\theta=10\) 到 \(\theta=9\) 是进步。</p>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 470" role="img" aria-label="一维点质量例子中 JS 散度饱和而 Wasserstein 距离提供连续方向">
+              <defs>
+                <linearGradient id="wgan-dirac-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.72"></stop>
+                </linearGradient>
+                <marker id="wgan-dirac-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="28" width="932" height="392" fill="url(#wgan-dirac-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">WGAN 的最小例子：两个点质量还没重叠时，也要知道谁更近</text>
+              <text class="label-small" x="52" y="98">JS 像是在问“能不能分开”；Wasserstein 像是在问“还要搬多远”。</text>
+
+              <line class="axis" x1="96" y1="268" x2="416" y2="268"></line>
+              <text class="label-small" x="92" y="304">0</text>
+              <text class="label-small" x="338" y="304">theta</text>
+              <circle class="dot-real" cx="104" cy="268" r="10"></circle>
+              <circle class="dot-model" cx="352" cy="268" r="10"></circle>
+              <path d="M 342 244 L 118 244" fill="none" stroke="#5d6b7a" stroke-width="2" marker-end="url(#wgan-dirac-arrow)"></path>
+              <text class="label-small label-blue" x="164" y="228">W1 = |theta|</text>
+              <text class="label-small label-orange" x="120" y="346">JS = log 2：只知道没重叠</text>
+
+              <line class="axis" x1="552" y1="318" x2="878" y2="318"></line>
+              <line class="axis" x1="552" y1="318" x2="552" y2="148"></line>
+              <path d="M 552 318 L 858 166" fill="none" stroke="#16a394" stroke-width="3"></path>
+              <path d="M 552 236 L 858 236" fill="none" stroke="#ff6b3d" stroke-width="3" stroke-dasharray="8 8"></path>
+              <text class="label-small label-blue" x="650" y="158">Wasserstein 随距离连续变化</text>
+              <text class="label-small label-orange" x="646" y="224">JS 在不重叠时近似饱和</text>
+              <text class="label-small" x="538" y="344">theta</text>
+              <text class="label-small" x="518" y="154">distance</text>
+              <text class="label-small" x="558" y="392">生成器需要的是蓝线这种“还有多远”的信号，而不是橙线这种“仍然能分开”的信号。</text>
+            </svg>
+            <figcaption>自绘图，参考 WGAN 论文的核心动机：当两个分布支撑不重叠时，JS 散度可能只告诉我们“它们不同”，却不告诉生成器如何靠近；Wasserstein 距离仍然随空间距离连续变化，因此更适合作为早期训练信号。</figcaption>
+          </figure>
+
           <p>WGAN 的 critic 目标是最大化：</p>
           <div class="equation">\[
             L_{\mathrm{critic}}
@@ -822,6 +889,21 @@ window.siteContent = {
             \mathbb{E}_{z\sim p_z}
             [f_\phi(G_\theta(z))].
           \]</div>
+          <p>因此 WGAN 训练时通常会让 critic 多更新几步，再更新一次生成器。原因是：critic 如果还没有接近当前 \(p_{\mathrm{data}}\) 与 \(p_g\) 的 Wasserstein 距离估计，生成器拿到的方向就不可靠。这里和原始 GAN 有一个明显区别：普通 GAN 的判别器太强时可能让生成器梯度饱和；WGAN 里我们反而希望 critic 在 Lipschitz 约束下尽量优化好，因为它提供的是距离估计和移动方向。</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>问题</th><th>原始 GAN</th><th>WGAN</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>判别网络输出</td><td>真假概率 \(D(x)\in(0,1)\)</td><td>实数分数 \(f(x)\)，不需要 sigmoid</td></tr>
+                <tr><td>理论距离</td><td>理想最优判别器下对应 JS 散度</td><td>1-Lipschitz critic 下估计 Wasserstein-1 距离</td></tr>
+                <tr><td>支撑不重叠</td><td>JS 可能饱和，距离变化不明显</td><td>距离仍随空间移动连续变化</td></tr>
+                <tr><td>约束重点</td><td>二分类能力与训练平衡</td><td>critic 必须满足 Lipschitz 约束</td></tr>
+                <tr><td>代码里的常见符号</td><td>discriminator / binary cross entropy</td><td>critic / Wasserstein estimate / gradient penalty</td></tr>
+              </tbody>
+            </table>
+          </div>
           <p>WGAN 的关键不是简单地“换了一个 loss”，而是把分布距离从 JS 换成 Wasserstein 距离，并要求 critic 满足 Lipschitz 约束。原始 WGAN 用 weight clipping 强行限制参数范围，但这会带来容量不足和优化问题。</p>
         </section>
 
@@ -859,6 +941,40 @@ window.siteContent = {
             +
             L_{\mathrm{GP}}.
           \]</div>
+          <p>为什么惩罚的是 \((\|\nabla_{\hat{x}}f_\phi(\hat{x})\|_2-1)^2\)，而不是只惩罚大于 1 的部分？严格地说，1-Lipschitz 只要求梯度范数不超过 1；但 WGAN-GP 的直觉来自最优运输路径：在真实样本和生成样本之间的关键连线上，最优 critic 往往会以接近最大允许斜率的方式变化，这样才能把两端的分数差拉到运输距离。因此论文选择让插值点附近的梯度范数靠近 1，而不是仅仅小于 1。</p>
+          <p>这也解释了为什么插值点选在真实样本和生成样本之间。WGAN 的 critic 不是要在整个输入空间每一个角落都完美满足约束；训练最关心的是当前真实分布和生成分布之间那片区域能不能给出平滑方向。梯度惩罚就是在这片区域提醒 critic：分数面不要陡到失控，也不要平到没有信号。</p>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="WGAN-GP 在真实样本与生成样本之间的插值点约束 critic 梯度">
+              <defs>
+                <linearGradient id="wgangp-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.74"></stop>
+                </linearGradient>
+                <marker id="wgangp-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="28" width="932" height="346" fill="url(#wgangp-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">WGAN-GP：在真实样本和生成样本之间约束 critic 的斜率</text>
+              <text class="label-small" x="52" y="98">critic 分数面要足够平滑，才能把“分布距离”变成生成器可用的方向。</text>
+              <circle class="dot-model" cx="162" cy="266" r="10"></circle>
+              <circle class="dot-real" cx="792" cy="154" r="10"></circle>
+              <path d="M 172 264 C 318 246, 494 212, 782 156" fill="none" stroke="#16a394" stroke-width="3" stroke-dasharray="8 8"></path>
+              <circle cx="322" cy="240" r="7" fill="#ffffff" stroke="#5d6b7a" stroke-width="2"></circle>
+              <circle cx="472" cy="212" r="7" fill="#ffffff" stroke="#5d6b7a" stroke-width="2"></circle>
+              <circle cx="626" cy="184" r="7" fill="#ffffff" stroke="#5d6b7a" stroke-width="2"></circle>
+              <path d="M 322 240 L 360 204" fill="none" stroke="#5d6b7a" stroke-width="2" marker-end="url(#wgangp-arrow)"></path>
+              <path d="M 472 212 L 510 176" fill="none" stroke="#5d6b7a" stroke-width="2" marker-end="url(#wgangp-arrow)"></path>
+              <path d="M 626 184 L 664 148" fill="none" stroke="#5d6b7a" stroke-width="2" marker-end="url(#wgangp-arrow)"></path>
+              <text class="label-small label-orange" x="112" y="302">generated</text>
+              <text class="label-small label-blue" x="754" y="130">real</text>
+              <text class="label-small" x="360" y="304">x_hat = epsilon x + (1-epsilon) x_fake</text>
+              <text class="label-small" x="364" y="332">在这些点附近，让 gradient norm 接近 1</text>
+            </svg>
+            <figcaption>自绘图，参考 WGAN-GP 的设计：梯度惩罚不是随便加一个正则项，而是在真实样本与生成样本的插值区域约束 critic 的局部斜率，让 Wasserstein 估计更平滑、更能给生成器提供方向。</figcaption>
+          </figure>
+
           <p>梯度惩罚的动机很具体：critic 要提供平滑、有意义的分布距离信号，而不是靠极端参数或尖锐决策边界赢过生成器。WGAN-GP 使训练通常比 weight clipping 更稳定。</p>
         </section>
 
@@ -979,7 +1095,9 @@ window.siteContent = {
           <h3>第四轮：能不能读后续论文？</h3>
           <p><strong>检查十一：你能否说明 DCGAN 改的是目标还是架构？</strong>主要改的是生成器和判别器的卷积架构，原始对抗目标主线不变。卡住时回到第 10 节。</p>
           <p><strong>检查十二：你能否说明 WGAN 为什么不用 sigmoid 判别器？</strong>WGAN 的 critic 不是输出真假概率，而是近似 Kantorovich-Rubinstein dual 中的 1-Lipschitz 函数。卡住时回到第 12 节。</p>
+          <p><strong>检查十二（补充）：你能否用 \(\delta_0\) 和 \(\delta_\theta\) 的例子解释 WGAN 的优势？</strong>应该能说出：当 \(\theta\neq0\) 时 JS 散度饱和为 \(\log2\)，但 Wasserstein 距离是 \(|\theta|\)，所以生成器仍然能知道自己离真实分布还有多远。卡住时回到第 12 节的一维点质量例子。</p>
           <p><strong>检查十三：你能否解释 WGAN-GP 的梯度惩罚在约束什么？</strong>它约束 critic 对输入的梯度范数，帮助满足 Lipschitz 条件。卡住时回到第 13 节。</p>
+          <p><strong>检查十三（补充）：你能否解释为什么梯度惩罚放在真实样本和生成样本的插值点上？</strong>因为当前训练最需要的是两类分布之间区域的平滑 critic 分数面；这片区域给出的方向直接影响生成器如何移动。卡住时回到第 13 节的 WGAN-GP 示意图。</p>
           <p><strong>检查十四：你能否解释 spectral normalization、feature matching 和 TTUR 分别在修什么？</strong>spectral normalization 约束判别器平滑性，feature matching 改生成器训练信号，TTUR 调整双网络学习速度。卡住时回到第 13.5 节。</p>
           <p>如果这些问题都能顺畅回答，说明你已经掌握 GAN 的核心理论：它如何把分布比较变成二分类博弈，为什么最优判别器导向 JS 散度，为什么理想全局最优是 \(p_g=p_{\mathrm{data}}\)，为什么实际训练要改损失和架构，以及 WGAN 为什么要换成 Wasserstein 距离。之后读 GAN、DCGAN、LSGAN、WGAN、WGAN-GP、Pix2Pix、CycleGAN、StyleGAN 等论文时，就能知道每篇是在改目标、改距离、改约束、改架构，还是改条件建模方式。</p>
         </section>
