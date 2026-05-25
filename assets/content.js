@@ -47,9 +47,48 @@ window.siteContent = {
           </ol>
           <p>如果 \(D_\phi(x)\) 很接近 1，判别器认为 \(x\) 很像真实样本；如果 \(D_\phi(x)\) 很接近 0，判别器认为 \(x\) 很像生成样本。训练时，判别器希望把真实样本判成 1，把生成样本判成 0；生成器希望自己生成的样本被判别器判成 1。</p>
 
-          <figure class="source-figure">
-            <img src="https://developers.google.com/static/machine-learning/gan/images/gan_diagram.svg?hl=zh-cn" alt="GAN 生成器和判别器结构图" loading="lazy" />
-            <figcaption>参考图：GAN 的基本结构。生成器把随机噪声变成样本，判别器同时看真实样本和生成样本，并输出真假判断。图片来源：Google Developers, Generative Adversarial Networks。</figcaption>
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="GAN 生成器和判别器的基本结构">
+              <defs>
+                <linearGradient id="gan-basic-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="gan-basic-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="324" fill="url(#gan-basic-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">GAN 的基本结构：生成器造样本，判别器比较真假</text>
+              <text class="label-small" x="52" y="98">生成器只看随机噪声；判别器同时看真实样本和生成样本，并把比较信号反传给生成器。</text>
+
+              <rect x="70" y="164" width="132" height="78" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="116" y="196">z</text>
+              <text class="label-small" x="92" y="220">random noise</text>
+              <path d="M 202 204 L 270 204" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-basic-arrow)"></path>
+
+              <rect x="286" y="164" width="154" height="78" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="326" y="196">生成器 G</text>
+              <text class="label-small" x="322" y="220">fake sample</text>
+              <path d="M 440 204 L 512 244" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-basic-arrow)"></path>
+
+              <rect x="286" y="276" width="154" height="58" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label-small label-blue" x="318" y="310">real data x</text>
+              <path d="M 440 304 L 512 264" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-basic-arrow)"></path>
+
+              <rect x="528" y="202" width="166" height="86" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="570" y="236">判别器 D</text>
+              <text class="label-small" x="554" y="260">probability real</text>
+              <path d="M 694 246 L 764 246" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-basic-arrow)"></path>
+
+              <rect x="780" y="202" width="126" height="86" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="826" y="236">输出</text>
+              <text class="label-small" x="806" y="260">real / fake score</text>
+
+              <path class="curve-soft" d="M 610 288 C 576 356, 360 356, 360 244"></path>
+              <text class="label-small label-orange" x="430" y="346">生成器通过判别器梯度知道假样本应该往哪里改</text>
+            </svg>
+            <figcaption>自绘图，参考 Google Developers GAN 教程的结构说明：生成器 \(G\) 把随机噪声变成样本，判别器 \(D\) 比较真实样本和生成样本。GAN 的训练信号来自这个比较过程，而不是显式计算 \(p_g(x)\)。</figcaption>
           </figure>
 
           <p>这张图很适合初学者建立直觉，但还不够。真正需要问的是：判别器为什么能提供分布差异信号？生成器为什么沿着这个信号更新后，\(p_g\) 会靠近 \(p_{\mathrm{data}}\)？这两个问题要靠目标函数和最优判别器推导来回答。</p>
@@ -535,9 +574,50 @@ window.siteContent = {
           <p>这一步固定判别器参数，只更新生成器参数 \(\theta\)。虽然判别器不更新，但梯度会穿过判别器传到生成器，因为 \(D_\phi(G_\theta(z))\) 对 \(G_\theta(z)\) 有导数，而 \(G_\theta(z)\) 又对 \(\theta\) 有导数。</p>
           <p>因此，判别器像一个会变化的损失函数。它不是最终目标本身，而是一个不断学习的训练信号。</p>
 
-          <figure class="source-figure">
-            <img src="https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/tutorials/source_zh_cn/generative/images/train_test.gif" alt="GAN 训练过程中生成样本逐步改善的动图" loading="lazy" />
-            <figcaption>参考动图：GAN 训练过程中生成样本逐步变清晰。读这类动图时要注意：视觉质量改善背后，是 \(p_g\) 在判别器信号推动下逐渐靠近 \(p_{\mathrm{data}}\)。图片来源：MindSpore GAN tutorial。</figcaption>
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="GAN 训练中判别器和生成器交替更新的流程图">
+              <defs>
+                <linearGradient id="gan-train-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="gan-train-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="324" fill="url(#gan-train-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">GAN 训练不是一次性优化，而是交替改进信号</text>
+              <text class="label-small" x="52" y="98">判别器先学会当前真假差异，生成器再沿着这个差异信号移动；下一轮判别器又会重新适应新的生成分布。</text>
+
+              <rect x="70" y="148" width="150" height="74" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="104" y="176">真实样本</text>
+              <text class="label-small" x="94" y="200">x ~ p_data</text>
+              <rect x="70" y="252" width="150" height="74" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="112" y="280">噪声</text>
+              <text class="label-small" x="100" y="304">z ~ p_z</text>
+
+              <path d="M 220 185 L 294 185" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-train-arrow)"></path>
+              <path d="M 220 289 L 294 289" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-train-arrow)"></path>
+              <rect x="310" y="252" width="154" height="74" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="350" y="280">生成器 G</text>
+              <text class="label-small" x="334" y="304">fake sample</text>
+              <path d="M 464 289 L 538 237" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-train-arrow)"></path>
+              <path d="M 464 185 L 538 216" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-train-arrow)"></path>
+
+              <rect x="554" y="184" width="164" height="86" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="598" y="216">判别器 D</text>
+              <text class="label-small" x="580" y="242">learn real / fake boundary</text>
+              <path d="M 718 226 L 788 226" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-train-arrow)"></path>
+
+              <rect x="806" y="176" width="112" height="102" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="836" y="208">梯度</text>
+              <text class="label-small" x="826" y="234">update D</text>
+              <text class="label-small" x="826" y="256">then update G</text>
+              <path d="M 862 278 C 862 334, 386 350, 386 326" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-train-arrow)"></path>
+
+              <text class="label-small label-blue" x="76" y="374">读训练动图时不要只看样本变清晰，要看清楚：清晰化背后是 p_g 被不断推向 p_data。</text>
+            </svg>
+            <figcaption>自绘图，参考 MindSpore GAN tutorial 的训练动图思路：GAN 训练中样本逐步变好，本质上是判别器提供的分布差异信号推动 \(p_g\) 靠近 \(p_{\mathrm{data}}\)。代码里要特别注意判别器步和生成器步分别固定谁、更新谁。</figcaption>
           </figure>
 
           <p>把 Goodfellow 原论文的训练算法翻译成实现语言，可以得到下面这个对照。初学者写代码时最容易错的地方，不是公式本身，而是“这一轮到底固定谁、更新谁”。</p>
@@ -611,13 +691,37 @@ window.siteContent = {
           <p>模式崩溃是 GAN 最经典的问题之一。所谓模式，指真实分布中的不同高概率区域。比如 MNIST 有 10 个数字类别，自然图像有许多物体、姿态、纹理和场景。如果生成器只覆盖其中一小部分，就叫模式崩溃。</p>
           <p>一个直观解释是：生成器的目标是骗过当前判别器，而不是显式最大化覆盖所有模式的似然。如果某个阶段生成器发现一类样本特别容易骗过判别器，它可能把大量噪声输入都映射到这类样本附近。判别器之后会追上来，但生成器可能又跳到另一个少数模式，于是训练出现震荡。</p>
           <p>用分布语言说，模式崩溃意味着 \(p_g\) 没有覆盖 \(p_{\mathrm{data}}\) 的全部高概率区域。它可能在某些区域生成质量很好，但整体分布缺少多样性。</p>
-          <figure class="source-figure">
-            <img src="https://developers.google.com/static/machine-learning/gan/images/bad_gan.svg?hl=zh-cn" alt="GAN 生成质量较差的示意图" loading="lazy" />
-            <figcaption>参考图：GAN 训练不好时，生成样本可能缺少真实数据的结构和多样性。图片来源：Google Developers, Generative Adversarial Networks。</figcaption>
-          </figure>
-          <figure class="source-figure">
-            <img src="https://developers.google.com/static/machine-learning/gan/images/good_gan.svg?hl=zh-cn" alt="GAN 生成质量较好的示意图" loading="lazy" />
-            <figcaption>参考图：训练较好时，生成样本更接近真实数据分布。评价 GAN 时不能只看单张样本，还要看分布覆盖和多样性。图片来源：Google Developers, Generative Adversarial Networks。</figcaption>
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="GAN 模式崩溃和良好分布覆盖的对比图">
+              <defs>
+                <linearGradient id="gan-quality-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+              </defs>
+              <rect x="24" y="30" width="932" height="324" fill="url(#gan-quality-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">评价 GAN：不能只看单张样本，要看覆盖了多少模式</text>
+              <text class="label-small" x="52" y="98">左边像是“会生成一个漂亮类别”，右边才更接近“学到了真实分布的多样性”。</text>
+
+              <line class="axis" x1="82" y1="292" x2="430" y2="292"></line>
+              <line class="axis" x1="82" y1="292" x2="82" y2="132"></line>
+              <path class="curve-real" d="M 94 284 C 126 268, 136 170, 182 148 C 230 126, 246 280, 296 274 C 342 268, 354 166, 404 150"></path>
+              <path class="curve-model" d="M 94 288 C 150 286, 166 258, 196 248 C 230 238, 238 250, 252 266 C 286 296, 356 296, 420 288"></path>
+              <text class="label" x="122" y="132">模式崩溃</text>
+              <text class="label-small label-blue" x="112" y="320">真实分布有多个峰</text>
+              <text class="label-small label-orange" x="252" y="320">生成分布只覆盖一小块</text>
+
+              <line class="axis" x1="548" y1="292" x2="896" y2="292"></line>
+              <line class="axis" x1="548" y1="292" x2="548" y2="132"></line>
+              <path class="curve-real" d="M 560 284 C 592 268, 602 170, 648 148 C 696 126, 712 280, 762 274 C 808 268, 820 166, 870 150"></path>
+              <path class="curve-model" d="M 560 286 C 594 272, 604 178, 650 154 C 696 132, 714 274, 762 270 C 808 266, 824 174, 872 158"></path>
+              <text class="label" x="594" y="132">覆盖较好</text>
+              <text class="label-small label-blue" x="578" y="320">峰的位置和权重大体对齐</text>
+              <text class="label-small label-orange" x="770" y="320">多样性更可靠</text>
+
+              <text class="label-small" x="84" y="374">所以 FID、随机批量样本、最近邻检查和类别覆盖都很重要；只挑几张好图会高估模型。</text>
+            </svg>
+            <figcaption>自绘图，参考 Google Developers GAN 教程里的 bad/good GAN 对比：训练差的 GAN 可能只覆盖真实分布的少数模式；训练较好的 GAN 不只样本清晰，还要覆盖真实分布的多样性。</figcaption>
           </figure>
         </section>
 
@@ -1038,9 +1142,40 @@ window.siteContent = {
             <figcaption>自绘图：VAE 不是普通 autoencoder 加一点随机性。它一边用 \(q_\phi(z|x)\) 近似“哪个 \(z\) 解释这个 \(x\)”的后验，一边用 \(p_\theta(x|z)\) 学会从潜变量生成数据；ELBO 则把重建能力和潜空间正则化同时放进一个可优化目标。</figcaption>
           </figure>
 
-          <figure class="source-figure">
-            <img src="https://lilianweng.github.io/posts/2018-08-12-vae/vae-graphical-model.png" alt="VAE 概率图模型" loading="lazy" />
-            <figcaption>参考图：VAE 的概率图模型。实线部分表示生成模型 \(p_\theta(x,z)=p(z)p_\theta(x|z)\)，虚线部分表示用 encoder 近似后验 \(q_\phi(z|x)\)。图片来源：Lilian Weng, From Autoencoder to Beta-VAE。</figcaption>
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="VAE 生成模型和近似后验的概率图模型">
+              <defs>
+                <linearGradient id="vae-graph-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="vae-graph-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="324" fill="url(#vae-graph-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">VAE 有两条方向：生成方向和推断方向</text>
+              <text class="label-small" x="52" y="98">生成模型从先验 z 产生 x；encoder 不是生成过程的一部分，而是为了训练时近似后验。</text>
+
+              <circle cx="248" cy="218" r="56" fill="#ffffff" stroke="#2f80ed" stroke-width="2"></circle>
+              <text class="label" x="238" y="224">z</text>
+              <circle cx="506" cy="218" r="56" fill="#ffffff" stroke="#ff6b3d" stroke-width="2"></circle>
+              <text class="label" x="496" y="224">x</text>
+              <path d="M 304 218 L 438 218" fill="none" stroke="#2f80ed" stroke-width="2.4" marker-end="url(#vae-graph-arrow)"></path>
+              <text class="label-small label-blue" x="332" y="194">p_theta(x|z)</text>
+              <text class="label-small" x="194" y="306">先验 p(z)</text>
+              <text class="label-small" x="456" y="306">观测数据 x</text>
+
+              <path d="M 494 162 C 456 90, 294 90, 258 162" fill="none" stroke="#ff6b3d" stroke-width="2.2" stroke-dasharray="8 7" marker-end="url(#vae-graph-arrow)"></path>
+              <text class="label-small label-orange" x="318" y="126">q_phi(z|x)</text>
+
+              <rect x="642" y="138" width="250" height="162" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="668" y="172">读图要点</text>
+              <text class="label-small" x="668" y="204">1. 生成时只走 z -> x</text>
+              <text class="label-small" x="668" y="232">2. 训练时需要 x -> z 的近似后验</text>
+              <text class="label-small" x="668" y="260">3. ELBO 把两条方向接到一起</text>
+            </svg>
+            <figcaption>自绘图，参考 Lilian Weng 的 VAE 概率图解释：实线表示生成模型 \(p_\theta(x,z)=p(z)p_\theta(x|z)\)，虚线表示训练时引入的近似后验 \(q_\phi(z|x)\)。区分这两条方向，是理解 VAE 的第一道关。</figcaption>
           </figure>
         </section>
 
@@ -1483,9 +1618,48 @@ window.siteContent = {
             <figcaption>自绘图：重参数化技巧的关键不是“换一种采样写法”这么简单，而是把随机性固定到 \(\epsilon\) 上，让 \(z\) 成为 \(\mu_\phi(x)\)、\(\sigma_\phi(x)\) 的可微函数。这样 reconstruction loss 和 KL loss 的梯度才能稳定地更新 encoder。</figcaption>
           </figure>
 
-          <figure class="source-figure">
-            <img src="https://lilianweng.github.io/posts/2018-08-12-vae/vae-gaussian.png" alt="高斯 VAE 架构与重参数化" loading="lazy" />
-            <figcaption>参考图：高斯 VAE 中 encoder 输出 \(\mu\) 和 \(\sigma\)，通过重参数化采样 \(z\)，再由 decoder 重建 \(x\)。图片来源：Lilian Weng, From Autoencoder to Beta-VAE。</figcaption>
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="高斯 VAE 中重参数化技巧的计算路径">
+              <defs>
+                <linearGradient id="vae-reparam-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="vae-reparam-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="324" fill="url(#vae-reparam-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">重参数化：把随机采样改写成可反传的确定路径加外部噪声</text>
+              <text class="label-small" x="52" y="98">随机性来自 eps，参数只出现在 mu 和 sigma 里，所以梯度可以穿过 z 回到 encoder。</text>
+
+              <rect x="66" y="168" width="124" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="112" y="200">x</text>
+              <text class="label-small" x="92" y="224">input</text>
+              <path d="M 190 206 L 246 206" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-reparam-arrow)"></path>
+              <rect x="262" y="168" width="150" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="292" y="200">encoder</text>
+              <text class="label-small" x="286" y="224">mu, logvar</text>
+
+              <path d="M 412 206 L 468 170" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-reparam-arrow)"></path>
+              <path d="M 412 206 L 468 244" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-reparam-arrow)"></path>
+              <rect x="484" y="132" width="152" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="520" y="164">eps</text>
+              <text class="label-small" x="506" y="188">N(0,I)</text>
+              <rect x="484" y="238" width="152" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="512" y="270">z</text>
+              <text class="label-small" x="504" y="294">mu + sigma * eps</text>
+              <path d="M 560 208 L 560 238" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-reparam-arrow)"></path>
+
+              <path d="M 636 276 L 696 224" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-reparam-arrow)"></path>
+              <rect x="712" y="168" width="150" height="76" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="748" y="200">decoder</text>
+              <text class="label-small" x="740" y="224">p_theta(x|z)</text>
+
+              <path class="curve-soft" d="M 788 244 C 780 330, 338 330, 336 244"></path>
+              <text class="label-small label-blue" x="372" y="336">reconstruction + KL 的梯度可以更新 encoder 和 decoder</text>
+            </svg>
+            <figcaption>自绘图，参考 Lilian Weng 对高斯 VAE 的说明：encoder 输出 \(\mu\) 和 \(\sigma\)，采样写成 \(z=\mu+\sigma\odot\epsilon\)。这样随机性被隔离到 \(\epsilon\)，而 \(z\) 对 encoder 参数仍然可微。</figcaption>
           </figure>
         </section>
 
@@ -2606,9 +2780,54 @@ window.siteContent = {
           </ol>
           <p>这三个问题能把大多数生成模型串起来。</p>
 
-          <figure class="source-figure">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/3/34/Three-generative-models.png" alt="自回归模型、VAE 和 GAN 的生成模型示意图" loading="lazy" />
-            <figcaption>参考图：三类经典生成模型的结构对比。读图时不要只看网络形状，而要问它们分别怎样表达分布、怎样训练、怎样采样。图片来源：Wikimedia Commons, Three-generative-models.png。</figcaption>
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 470" role="img" aria-label="几类生成模型如何表达分布、训练和采样的路线图">
+              <defs>
+                <linearGradient id="gen-models-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="gen-models-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="364" fill="url(#gen-models-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">不同生成模型，其实是在回答同一个问题</text>
+              <text class="label-small" x="52" y="98">怎样表示一个接近真实数据分布的 p_theta(x)，怎样训练它，怎样从里面采样？</text>
+
+              <rect x="62" y="144" width="182" height="168" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="100" y="178">显式密度</text>
+              <text class="label-small" x="86" y="210">直接写 p_theta(x)</text>
+              <text class="label-small" x="86" y="238">训练：最大似然</text>
+              <text class="label-small" x="86" y="266">采样：按密度生成</text>
+              <path class="curve-soft" d="M 92 292 C 128 262, 174 262, 216 292"></path>
+
+              <rect x="292" y="144" width="182" height="168" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="334" y="178">VAE</text>
+              <text class="label-small" x="316" y="210">z -> x 的潜变量模型</text>
+              <text class="label-small" x="316" y="238">训练：ELBO</text>
+              <text class="label-small" x="316" y="266">采样：z ~ p(z)</text>
+              <circle class="dot-model" cx="342" cy="294" r="8"></circle>
+              <path d="M 350 294 L 420 294" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gen-models-arrow)"></path>
+              <circle class="dot-real" cx="434" cy="294" r="8"></circle>
+
+              <rect x="522" y="144" width="182" height="168" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="566" y="178">GAN</text>
+              <text class="label-small" x="546" y="210">只要求能采样 p_g</text>
+              <text class="label-small" x="546" y="238">训练：判别器比较分布</text>
+              <text class="label-small" x="546" y="266">采样：z -> G(z)</text>
+              <path class="curve-model" d="M 552 294 C 590 266, 636 266, 674 294"></path>
+
+              <rect x="752" y="144" width="182" height="168" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="786" y="178">Diffusion / Flow</text>
+              <text class="label-small" x="776" y="210">学习从简单分布到数据</text>
+              <text class="label-small" x="776" y="238">训练：去噪或速度场</text>
+              <text class="label-small" x="776" y="266">采样：沿路径移动</text>
+              <path d="M 784 298 C 816 260, 860 260, 902 298" fill="none" stroke="#16a394" stroke-width="2.4" marker-end="url(#gen-models-arrow)"></path>
+
+              <text class="label-small label-blue" x="88" y="354">读结构图时，最重要的不是网络长什么样，而是它如何表达分布、如何训练、如何采样。</text>
+            </svg>
+            <figcaption>自绘图，参考经典生成模型结构对比图的读法：显式密度模型、VAE、GAN、Diffusion/Flow 只是分布拟合的不同实现路线。理解它们时要同时问三个问题：分布怎么表示，目标怎么优化，样本怎么生成。</figcaption>
           </figure>
         </section>
 
@@ -2798,7 +3017,7 @@ window.siteContent = {
           <p>本文会尽量把每一步的“为什么”说清楚。公式不是为了显得高级，而是为了把直觉固定下来：你知道每个符号是什么意思，才知道论文里的省略步骤在省略什么。</p>
 
           <figure class="source-figure">
-            <img src="https://lilianweng.github.io/posts/2021-07-11-diffusion-models/generative-overview.png" alt="生成模型类型对比图" loading="lazy" />
+            <img src="https://lilianweng.github.io/posts/2021-07-11-diffusion-models/generative-overview.png" alt="生成模型类型对比图" loading="eager" />
             <figcaption>参考图：GAN、VAE、Flow-based model 和 Diffusion model 的结构对比。Diffusion 可以看成从数据到噪声、再从噪声回到数据的建模路线。图片来源：Lilian Weng, What are Diffusion Models?</figcaption>
           </figure>
 
@@ -3049,9 +3268,32 @@ window.siteContent = {
           <p>所以闭式公式成立。</p>
           <div class="insight-box">这个公式是 DDPM 训练能高效进行的关键。训练时我们可以随机抽一个 \(t\)，一次性合成 \(x_t\)，不需要真的执行 \(t\) 次加噪。</div>
 
-          <figure class="source-figure">
-            <img src="https://lilianweng.github.io/posts/2021-07-11-diffusion-models/diffusion-beta.png" alt="线性和余弦噪声日程对比" loading="lazy" />
-            <figcaption>参考图：不同噪声 schedule 下 \(\bar{\alpha}_t\) 的衰减方式。它帮助理解不同时间步中原始信号还保留多少。图片来源：Lilian Weng, What are Diffusion Models?</figcaption>
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="线性和余弦噪声日程下信号保留量的对比曲线">
+              <defs>
+                <linearGradient id="diff-schedule-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+              </defs>
+              <rect x="24" y="30" width="932" height="324" fill="url(#diff-schedule-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">噪声 schedule 决定每个时间步还剩多少原始信号</text>
+              <text class="label-small" x="52" y="98">纵轴可以理解成 signal power，越往右噪声越强，模型看到的 x_t 越接近纯噪声。</text>
+
+              <line class="axis" x1="100" y1="292" x2="870" y2="292"></line>
+              <line class="axis" x1="100" y1="292" x2="100" y2="128"></line>
+              <text class="label-small" x="94" y="118">signal</text>
+              <text class="label-small" x="850" y="318">t</text>
+              <path class="curve-real" d="M 116 142 C 210 150, 310 174, 410 206 C 520 240, 650 272, 856 288"></path>
+              <path class="curve-model" d="M 116 142 C 220 142, 312 150, 408 172 C 526 202, 690 270, 856 288"></path>
+              <line class="guide" x1="340" y1="128" x2="340" y2="292"></line>
+              <line class="guide" x1="626" y1="128" x2="626" y2="292"></line>
+              <text class="label-small label-blue" x="178" y="164">linear-like</text>
+              <text class="label-small label-orange" x="468" y="182">cosine-like</text>
+              <text class="label-small" x="248" y="324">中低噪声：细节仍可辨认</text>
+              <text class="label-small" x="610" y="324">高噪声：主要学习整体方向</text>
+            </svg>
+            <figcaption>自绘图，参考 Lilian Weng 对 diffusion noise schedule 的解释：\(\bar{\alpha}_t\) 控制信号保留量，\(1-\bar{\alpha}_t\) 控制噪声量。schedule 不是装饰参数，它会改变不同噪声等级的训练难度和采样行为。</figcaption>
           </figure>
 
         </section>
@@ -3089,9 +3331,45 @@ window.siteContent = {
           \]</div>
           <p>这个分布可以精确推导成高斯。然后我们让神经网络学习一个高斯反向转移来近似它。</p>
 
-          <figure class="source-figure">
-            <img src="https://lilianweng.github.io/posts/2021-07-11-diffusion-models/DDPM.png" alt="DDPM 前向扩散和反向去噪示意图" loading="lazy" />
-            <figcaption>参考图：DDPM 的前向扩散链和反向去噪链。读图时重点看方向：前向 \(q\) 是人为设计的加噪，反向 \(p_\theta\) 才是模型学习的生成过程。图片来源：Lilian Weng, What are Diffusion Models?</figcaption>
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="DDPM 前向加噪链和反向去噪链的方向对比">
+              <defs>
+                <linearGradient id="ddpm-chain-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="ddpm-chain-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="324" fill="url(#ddpm-chain-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">DDPM 有两条链：前向 q 固定，反向 p_theta 要学习</text>
+              <text class="label-small" x="52" y="98">前向链把数据逐步破坏成噪声；生成时沿反向链，从噪声一步步回到数据。</text>
+
+              <text class="label label-blue" x="80" y="148">前向扩散 q</text>
+              <circle class="dot-real" cx="138" cy="214" r="18"></circle>
+              <circle cx="138" cy="214" r="42" fill="none" stroke="#2f80ed" stroke-width="2"></circle>
+              <circle class="dot-real" cx="294" cy="214" r="14" opacity="0.8"></circle>
+              <circle cx="294" cy="214" r="42" fill="none" stroke="#2f80ed" stroke-width="2" opacity="0.7"></circle>
+              <circle class="dot-real" cx="450" cy="214" r="10" opacity="0.55"></circle>
+              <circle cx="450" cy="214" r="42" fill="none" stroke="#2f80ed" stroke-width="2" opacity="0.45"></circle>
+              <circle cx="606" cy="214" r="42" fill="none" stroke="#b8c5d1" stroke-width="2" stroke-dasharray="5 6"></circle>
+              <circle cx="606" cy="214" r="5" fill="#b8c5d1"></circle>
+              <path d="M 180 214 L 248 214" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#ddpm-chain-arrow)"></path>
+              <path d="M 336 214 L 404 214" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#ddpm-chain-arrow)"></path>
+              <path d="M 492 214 L 560 214" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#ddpm-chain-arrow)"></path>
+              <text class="label-small" x="112" y="280">x0</text>
+              <text class="label-small" x="268" y="280">x1</text>
+              <text class="label-small" x="424" y="280">xt</text>
+              <text class="label-small" x="580" y="280">xT</text>
+
+              <path d="M 628 160 C 720 118, 828 120, 866 184" fill="none" stroke="#ff6b3d" stroke-width="2.3" marker-end="url(#ddpm-chain-arrow)"></path>
+              <path d="M 866 244 C 780 312, 636 318, 548 256" fill="none" stroke="#ff6b3d" stroke-width="2.3" marker-end="url(#ddpm-chain-arrow)"></path>
+              <text class="label label-orange" x="704" y="172">反向生成 p_theta</text>
+              <text class="label-small" x="704" y="204">学习每一步 x_t -> x_{t-1}</text>
+              <text class="label-small" x="704" y="232">不是简单代数求逆</text>
+            </svg>
+            <figcaption>自绘图，参考 Lilian Weng 的 DDPM 链式示意：前向 \(q\) 是人为规定的加噪过程，反向 \(p_\theta\) 才是模型要学习的生成过程。反向链不能把前向公式简单倒过来，因为从 noisy \(x_t\) 到干净 \(x_0\) 是不适定问题。</figcaption>
           </figure>
 
         </section>
@@ -3735,14 +4013,87 @@ window.siteContent = {
             <figcaption>自绘图：Conditional Flow Matching 的监督信号来自条件路径 \(p_t(x|z)\)。每条路径都有可写出的条件速度 \(u_t(x|z)\)，但生成时样本只知道自己在 \(x_t=x\)，不知道来自哪条路径。因此网络回归条件速度的平方损失，最终学到的是这些条件速度在当前位置下的平均，也就是边缘速度场 \(v_t(x)\)。</figcaption>
           </figure>
 
-          <figure class="source-figure">
-            <img src="https://mlg.eng.cam.ac.uk/blog/assets/images/flow-matching/g2g-cond-paths-one-color.png" alt="Flow Matching 条件路径示意图" loading="lazy" />
-            <figcaption>参考图：Flow Matching 中从源分布到目标分布的条件路径。它帮助理解为什么训练时可以有条件速度监督，而生成时模型学到的是边缘速度场。图片来源：Cambridge MLG Blog, Flow Matching Guide and Code。</figcaption>
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="Flow Matching 中条件路径和边缘速度场的关系">
+              <defs>
+                <linearGradient id="fm-path-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="fm-path-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="324" fill="url(#fm-path-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">Flow Matching 的图要这样读：条件路径可监督，边缘速度才用于生成</text>
+              <text class="label-small" x="52" y="98">训练时知道一对端点或条件变量；生成时只知道当前位置，所以模型要学条件速度的平均效果。</text>
+
+              <circle class="dot-model" cx="126" cy="282" r="8"></circle>
+              <circle class="dot-model" cx="166" cy="214" r="8"></circle>
+              <circle class="dot-model" cx="214" cy="260" r="8"></circle>
+              <circle class="dot-real" cx="392" cy="148" r="8"></circle>
+              <circle class="dot-real" cx="418" cy="230" r="8"></circle>
+              <circle class="dot-real" cx="368" cy="306" r="8"></circle>
+              <path class="curve-soft" d="M 126 282 C 194 230, 290 176, 392 148"></path>
+              <path class="curve-soft" d="M 166 214 C 252 214, 324 220, 418 230"></path>
+              <path class="curve-soft" d="M 214 260 C 258 290, 312 304, 368 306"></path>
+              <path d="M 252 206 L 318 174" fill="none" stroke="#5d6b7a" stroke-width="2" marker-end="url(#fm-path-arrow)"></path>
+              <path d="M 264 224 L 336 226" fill="none" stroke="#5d6b7a" stroke-width="2" marker-end="url(#fm-path-arrow)"></path>
+              <path d="M 274 282 L 330 300" fill="none" stroke="#5d6b7a" stroke-width="2" marker-end="url(#fm-path-arrow)"></path>
+              <text class="label-small label-orange" x="92" y="338">source distribution</text>
+              <text class="label-small label-blue" x="342" y="338">data distribution</text>
+
+              <path d="M 470 224 L 548 224" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#fm-path-arrow)"></path>
+              <text class="label-small" x="466" y="204">固定当前位置 x_t</text>
+              <text class="label-small" x="466" y="252">平均可能条件速度</text>
+
+              <circle cx="684" cy="224" r="10" fill="#ff6b3d"></circle>
+              <path d="M 684 224 L 736 184" fill="none" stroke="#b8c5d1" stroke-width="2.2" marker-end="url(#fm-path-arrow)"></path>
+              <path d="M 684 224 L 754 226" fill="none" stroke="#b8c5d1" stroke-width="2.2" marker-end="url(#fm-path-arrow)"></path>
+              <path d="M 684 224 L 724 282" fill="none" stroke="#b8c5d1" stroke-width="2.2" marker-end="url(#fm-path-arrow)"></path>
+              <path d="M 684 224 L 774 220" fill="none" stroke="#2f80ed" stroke-width="4" marker-end="url(#fm-path-arrow)"></path>
+              <text class="label" x="626" y="152">marginal velocity</text>
+              <text class="label-small" x="626" y="180">v_t(x) = average direction</text>
+              <text class="label-small label-blue" x="782" y="224">生成时使用</text>
+            </svg>
+            <figcaption>自绘图，参考 Cambridge MLG Flow Matching blog 的条件路径图：条件速度 \(u_t(x|z)\) 在训练时可构造，但生成时不知道条件变量 \(z\)。模型通过回归条件速度，最终学到的是当前位置下的边缘速度场 \(v_t(x)\)。</figcaption>
           </figure>
 
-          <figure class="source-figure">
-            <img src="https://diffusionflow.github.io/assets/img/2025-04-28-distill-example/particle_movement.gif" alt="DiffusionFlow 粒子沿速度场移动示意动图" loading="lazy" />
-            <figcaption>参考动图：把样本看成粒子沿速度场从简单分布移动到数据分布，有助于把 Flow Matching 的 ODE 视角和 Diffusion 的分布运输视角连起来。图片来源：DiffusionFlow。</figcaption>
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="把样本看成粒子沿速度场从噪声分布移动到数据分布">
+              <defs>
+                <linearGradient id="transport-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="transport-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="324" fill="url(#transport-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">分布运输视角：样本不是被“画出来”，而是被速度场搬过去</text>
+              <text class="label-small" x="52" y="98">Flow Matching 和 probability flow ODE 都可以这样想：一群粒子从简单分布出发，沿着学到的速度场移动到数据分布。</text>
+
+              <circle class="dot-model" cx="120" cy="250" r="7"></circle>
+              <circle class="dot-model" cx="154" cy="198" r="7"></circle>
+              <circle class="dot-model" cx="190" cy="286" r="7"></circle>
+              <circle class="dot-model" cx="214" cy="226" r="7"></circle>
+              <path d="M 120 250 C 252 202, 376 182, 512 190" fill="none" stroke="#16a394" stroke-width="2.4" marker-end="url(#transport-arrow)"></path>
+              <path d="M 154 198 C 292 154, 444 158, 612 204" fill="none" stroke="#16a394" stroke-width="2.4" marker-end="url(#transport-arrow)"></path>
+              <path d="M 190 286 C 332 308, 478 300, 630 264" fill="none" stroke="#16a394" stroke-width="2.4" marker-end="url(#transport-arrow)"></path>
+              <path d="M 214 226 C 338 238, 500 228, 706 172" fill="none" stroke="#16a394" stroke-width="2.4" marker-end="url(#transport-arrow)"></path>
+
+              <circle class="dot-real" cx="532" cy="190" r="8"></circle>
+              <circle class="dot-real" cx="632" cy="204" r="8"></circle>
+              <circle class="dot-real" cx="650" cy="264" r="8"></circle>
+              <circle class="dot-real" cx="726" cy="172" r="8"></circle>
+              <path class="curve-real" d="M 500 150 C 570 120, 700 124, 772 174 C 824 210, 772 282, 674 296 C 576 310, 488 256, 500 150"></path>
+
+              <text class="label-small label-orange" x="94" y="328">初始噪声粒子</text>
+              <text class="label-small label-blue" x="558" y="328">目标数据区域</text>
+              <text class="label-small" x="356" y="354">速度场决定每个位置下一步往哪里走</text>
+            </svg>
+            <figcaption>自绘图，参考 DiffusionFlow 的粒子移动直觉：把生成过程看成概率质量运输，会更容易把 DDIM、probability flow ODE、Flow Matching 和 Rectified Flow 放到同一张地图里。</figcaption>
           </figure>
 
           <h3>Flow Matching 和 Diffusion 的区别在哪里？</h3>
