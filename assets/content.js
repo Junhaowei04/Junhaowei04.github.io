@@ -2297,6 +2297,133 @@ window.siteContent = {
             \right].
           \]</div>
           <p>当 \(K=1\) 时，它退回普通 VAE 的 ELBO。\(K\) 越大，下界通常越紧，但计算更贵。</p>
+          <p>这条公式为什么成立？先定义重要性权重：</p>
+          <div class="equation">\[
+            w_k
+            =
+            \frac{p_\theta(x,z_k)}
+            {q_\phi(z_k|x)},
+            \qquad
+            z_k\sim q_\phi(z|x).
+          \]</div>
+          <p>因为：</p>
+          <div class="equation">\[
+            \mathbb{E}_{q_\phi(z|x)}
+            \left[
+            \frac{p_\theta(x,z)}
+            {q_\phi(z|x)}
+            \right]
+            =
+            \int
+            q_\phi(z|x)
+            \frac{p_\theta(x,z)}
+            {q_\phi(z|x)}
+            dz
+            =
+            \int p_\theta(x,z)dz
+            =
+            p_\theta(x),
+          \]</div>
+          <p>所以 \(\frac{1}{K}\sum_k w_k\) 是 \(p_\theta(x)\) 的无偏 Monte Carlo 估计。可是我们真正想要的是 \(\log p_\theta(x)\)，不是 \(p_\theta(x)\)。由于 \(\log\) 是凹函数，Jensen 不等式给出：</p>
+          <div class="equation">\[
+            \mathbb{E}
+            \left[
+            \log
+            \frac{1}{K}
+            \sum_{k=1}^K w_k
+            \right]
+            \leq
+            \log
+            \mathbb{E}
+            \left[
+            \frac{1}{K}
+            \sum_{k=1}^K w_k
+            \right]
+            =
+            \log p_\theta(x).
+          \]</div>
+          <p>这就是 IWAE bound 的来源。它没有改变模型结构，也没有换掉 encoder-decoder；它改变的是用来训练的下界。普通 VAE 只拿一个 \(z\) 来估计下界，IWAE 拿 \(K\) 个 \(z\)，让其中更能解释当前 \(x\) 的样本通过更大的权重发挥作用。</p>
+          <p>当 \(K=1\) 时，IWAE 公式会精确退回普通 VAE 的 ELBO：</p>
+          <div class="equation">\[
+            \mathbb{E}_{z\sim q_\phi(z|x)}
+            \left[
+            \log
+            \frac{p_\theta(x,z)}
+            {q_\phi(z|x)}
+            \right]
+            =
+            \mathbb{E}_{q_\phi}
+            [\log p_\theta(x|z)]
+            -
+            D_{\mathrm{KL}}(q_\phi(z|x)\|p(z)).
+          \]</div>
+          <p>所以 IWAE 不是另一套完全不同的模型，而是 VAE 的一个更紧下界版本。Burda、Grosse 和 Salakhutdinov 的 IWAE 论文证明：在通常条件下，\(K\) 增大时这个下界单调不下降，并且会更接近真实 \(\log p_\theta(x)\)。直觉上，更多候选 \(z_k\) 会提高“至少有一个潜变量样本很好解释 \(x\)”的机会。</p>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 480" role="img" aria-label="IWAE 用多个重要性样本构造更紧的 VAE 下界">
+              <defs>
+                <linearGradient id="iwae-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.74"></stop>
+                </linearGradient>
+                <marker id="iwae-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="28" width="932" height="386" fill="url(#iwae-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">IWAE：不是换模型，而是用多个重要性样本让下界更紧</text>
+              <text class="label-small" x="52" y="98">VAE 只抽一个 z；IWAE 抽多个 z，计算每个样本解释 x 的权重，再对平均权重取 log。</text>
+
+              <rect x="74" y="158" width="128" height="82" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="122" y="190">x</text>
+              <text class="label-small" x="100" y="214">data point</text>
+              <path d="M 202 199 L 286 199" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#iwae-arrow)"></path>
+
+              <rect x="304" y="128" width="158" height="142" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="342" y="160">encoder</text>
+              <text class="label-small" x="330" y="188">sample z1 ... zK</text>
+              <circle class="dot-model" cx="346" cy="224" r="7"></circle>
+              <circle class="dot-model" cx="382" cy="224" r="7"></circle>
+              <circle class="dot-model" cx="418" cy="224" r="7"></circle>
+
+              <path d="M 462 198 L 540 198" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#iwae-arrow)"></path>
+              <rect x="558" y="118" width="178" height="162" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="594" y="150">importance weights</text>
+              <text class="label-small" x="590" y="184">wk = joint / proposal</text>
+              <rect x="596" y="210" width="90" height="16" fill="#2f80ed" opacity="0.78"></rect>
+              <rect x="596" y="236" width="46" height="16" fill="#ff6b3d" opacity="0.72"></rect>
+              <rect x="596" y="262" width="116" height="16" fill="#16a394" opacity="0.72"></rect>
+
+              <path d="M 736 198 L 812 198" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#iwae-arrow)"></path>
+              <rect x="828" y="132" width="92" height="134" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="852" y="164">log mean</text>
+              <text class="label-small" x="844" y="196">tighter</text>
+              <text class="label-small" x="846" y="220">bound</text>
+
+              <line class="axis" x1="118" y1="352" x2="844" y2="352"></line>
+              <path d="M 144 340 C 280 332, 412 310, 552 274 C 660 246, 748 230, 828 224" fill="none" stroke="#2f80ed" stroke-width="3"></path>
+              <line x1="144" y1="326" x2="828" y2="326" stroke="#ff6b3d" stroke-width="2.4" stroke-dasharray="8 8"></line>
+              <text class="label-small label-orange" x="156" y="316">K=1: ordinary ELBO</text>
+              <text class="label-small label-blue" x="620" y="250">larger K: closer to log likelihood</text>
+            </svg>
+            <figcaption>自绘图，参考 IWAE 论文的核心思想：重要性权重 \(w_k=p_\theta(x,z_k)/q_\phi(z_k|x)\) 是对边缘似然的采样估计。把多个权重平均后取对数，得到仍然低于 \(\log p_\theta(x)\) 但通常更紧的下界。</figcaption>
+          </figure>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>问题</th><th>普通 VAE</th><th>IWAE</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>每个数据点采多少个 \(z\)</td><td>通常 1 个</td><td>\(K\) 个重要性样本</td></tr>
+                <tr><td>训练目标</td><td>单样本 ELBO</td><td>importance-weighted lower bound</td></tr>
+                <tr><td>和 \(\log p_\theta(x)\) 的关系</td><td>是下界，但可能比较松</td><td>仍是下界，通常更紧</td></tr>
+                <tr><td>模型结构</td><td>encoder + decoder</td><td>同样的 encoder + decoder，主要改目标估计</td></tr>
+                <tr><td>代价</td><td>便宜</td><td>更贵，且 \(K\) 很大时 encoder 梯度质量也需要小心</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>读 IWAE 时最容易误解的一点是：它不是说“多采样几次然后取最好的 \(z\)”这么粗糙。它是用重要性采样构造一个合法的似然下界。高权重样本会在目标里更有影响，但它们仍然通过 \(\log \frac{1}{K}\sum_k w_k\) 这个整体目标共同作用。理解这一点，才能把 IWAE 和普通“多次尝试挑一个结果”的工程直觉区分开。</p>
           <p><strong>Conditional VAE</strong>在生成时加入条件 \(y\)，例如类别标签或文本条件：</p>
           <div class="equation">\[
             p_\theta(x|y)
@@ -2375,6 +2502,7 @@ window.siteContent = {
           <h3>第四轮：能不能读后续论文？</h3>
           <p><strong>检查十二：你能否解释 β-VAE 改了什么？</strong>它改变的是 KL 正则强度，也就是重建质量、潜空间规整和 disentanglement 之间的权衡。卡住时回到第 14 节。</p>
           <p><strong>检查十三：你能否解释 IWAE 为什么是更紧下界？</strong>它用多个重要性样本估计边缘似然下界，\(K=1\) 时退化为普通 VAE。卡住时回到第 14 节。</p>
+          <p><strong>检查十三（补充）：你能否自己从重要性权重推回 IWAE bound？</strong>应该能写出 \(w_k=p_\theta(x,z_k)/q_\phi(z_k|x)\)，说明 \(\frac{1}{K}\sum_k w_k\) 是 \(p_\theta(x)\) 的无偏估计，再用 Jensen 不等式得到 \(\mathbb{E}[\log \frac{1}{K}\sum_k w_k]\leq \log p_\theta(x)\)。卡住时回到第 14 节的 IWAE 推导和示意图。</p>
           <p><strong>检查十四：你能否说明 VAE 和 Diffusion 的共同点与区别？</strong>共同点是都在最大化或近似最大化数据似然、学习生成分布；区别是 VAE 用潜变量积分和 ELBO，Diffusion 用逐步噪声路径和去噪目标。卡住时回到第 15 节。</p>
           <p><strong>检查十五：你能否评价一个 VAE 是不是学好了？</strong>不能只看重建，也不能只看采样。应该同时看 ELBO、重建、随机采样、插值、latent traversal 和 KL 使用情况。卡住时回到第 12.5 节和第 15.5 节。</p>
           <p>如果这十五个问题能顺畅回答，说明你已经不是在背 VAE 公式，而是真正理解了 VAE 为什么需要变分推断、为什么 ELBO 合理、为什么重参数化能训练、为什么 KL 会塑造潜空间。之后读 Kingma & Welling、Rezende、IWAE、β-VAE 或 Latent Diffusion 相关论文时，就能知道作者是在改先验、改后验族、改下界、改 decoder，还是改潜空间使用方式。</p>
