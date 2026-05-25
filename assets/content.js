@@ -3042,6 +3042,74 @@ window.siteContent = {
         </section>
 
         <section class="article-section">
+          <h2>7.2 KL 的方向：为什么同一个“分布差异”会有不同偏好？</h2>
+          <p>上面我们用的是 \(D_{\mathrm{KL}}(p_{\mathrm{data}}\|p_\theta)\)，也就是用真实分布给每个位置加权。这个方向常被称作 forward KL。它的核心惩罚是：真实世界会出现的东西，模型不能给太低概率。</p>
+          <p>如果反过来写成 \(D_{\mathrm{KL}}(p_\theta\|p_{\mathrm{data}})\)，也就是 reverse KL，行为会变得很不一样：</p>
+          <div class="equation">\[
+            D_{\mathrm{KL}}(p_\theta\|p_{\mathrm{data}})
+            =
+            \int
+            p_\theta(x)
+            \log
+            \frac{p_\theta(x)}
+            {p_{\mathrm{data}}(x)}
+            dx.
+          \]</div>
+          <p>这一次加权的是模型分布 \(p_\theta(x)\)。因此它更关心“模型自己会生成的位置，真实分布是否支持”。如果模型把概率放到真实分布几乎为 0 的地方，惩罚会非常重；但如果真实分布有一个模式，模型根本没有覆盖，因为那里 \(p_\theta(x)\) 很小，reverse KL 对这个遗漏的感知可能并不强。</p>
+          <p>这就是生成模型里经常听到的两个直觉：</p>
+          <ol>
+            <li><strong>Forward KL 更怕漏掉真实模式。</strong>如果 \(p_{\mathrm{data}}(x)>0\) 但 \(p_\theta(x)\) 很小，\(\log \frac{p_{\mathrm{data}}}{p_\theta}\) 会很大，所以模型会被迫覆盖真实数据的重要区域。</li>
+            <li><strong>Reverse KL 更怕生成到真实分布外面。</strong>如果 \(p_\theta(x)>0\) 但 \(p_{\mathrm{data}}(x)\) 很小，\(\log \frac{p_\theta}{p_{\mathrm{data}}}\) 会很大，所以模型倾向于把概率集中在它确信真实的区域。</li>
+          </ol>
+          <p>一个常见比喻是：forward KL 有 mode-covering 倾向，reverse KL 有 mode-seeking 倾向。这里的 mode 可以理解为真实数据分布里的一个高概率簇，比如不同数字、不同动物姿态、不同语义类别。mode-covering 是“尽量别漏掉真实世界会出现的类型”；mode-seeking 是“宁可只抓住某些可靠类型，也别跑到真实分布外”。</p>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 480" role="img" aria-label="Forward KL 和 Reverse KL 对多峰分布的不同偏好">
+              <defs>
+                <linearGradient id="kl-direction-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.74"></stop>
+                </linearGradient>
+              </defs>
+              <rect x="24" y="28" width="932" height="388" fill="url(#kl-direction-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">KL 方向不同，模型犯错的偏好也不同</text>
+              <text class="label-small" x="52" y="98">蓝色是真实多峰分布；橙色是模型分布。Forward KL 更怕漏模式，Reverse KL 更怕把概率放到真实分布外。</text>
+
+              <line class="axis" x1="78" y1="322" x2="438" y2="322"></line>
+              <line class="axis" x1="78" y1="322" x2="78" y2="142"></line>
+              <path class="curve-real" d="M 90 318 C 128 314, 140 186, 182 178 C 224 170, 232 314, 268 318 C 306 314, 318 186, 360 178 C 402 170, 410 314, 430 318"></path>
+              <path class="curve-model" d="M 90 318 C 122 308, 138 232, 182 220 C 236 206, 284 206, 338 220 C 386 232, 404 308, 430 318"></path>
+              <text class="label" x="114" y="150">Forward KL</text>
+              <text class="label-small" x="112" y="356">倾向覆盖两个真实模式，中间可能也给一些概率</text>
+              <text class="label-small label-blue" x="118" y="388">怕漏掉 pdata 的高概率区域</text>
+
+              <line class="axis" x1="542" y1="322" x2="902" y2="322"></line>
+              <line class="axis" x1="542" y1="322" x2="542" y2="142"></line>
+              <path class="curve-real" d="M 554 318 C 592 314, 604 186, 646 178 C 688 170, 696 314, 732 318 C 770 314, 782 186, 824 178 C 866 170, 874 314, 894 318"></path>
+              <path class="curve-model" d="M 554 320 C 604 312, 606 192, 648 180 C 690 168, 700 312, 742 320"></path>
+              <text class="label" x="578" y="150">Reverse KL</text>
+              <text class="label-small" x="578" y="356">可能只贴住一个模式，避免覆盖真实低密度区域</text>
+              <text class="label-small label-orange" x="578" y="388">怕生成到 pdata 几乎为 0 的地方</text>
+            </svg>
+            <figcaption>自绘图：KL 不是对称距离。最小化 \(D_{\mathrm{KL}}(p_{\mathrm{data}}\|p_\theta)\) 时，真实分布高概率区域会强烈要求模型给概率，因此更偏 mode-covering；最小化 \(D_{\mathrm{KL}}(p_\theta\|p_{\mathrm{data}})\) 时，模型自己生成的位置必须被真实分布支持，因此更偏 mode-seeking。</figcaption>
+          </figure>
+
+          <p>这个区别能帮助我们读后面的模型。最大似然对应的 \(D_{\mathrm{KL}}(p_{\mathrm{data}}\|p_\theta)\) 会强烈惩罚漏掉训练数据模式，所以显式似然模型常常倾向于覆盖数据分布。VAE 的 ELBO 里也有类似的 maximum likelihood 主线，但因为 decoder likelihood、后验近似和 KL 正则的限制，生成结果可能变模糊。GAN 不直接优化这个 forward KL，而是通过判别器比较分布；训练不好时可能出现 mode collapse，也就是只覆盖一部分真实模式。理解 KL 方向后，这些现象就不再是孤立经验，而是不同分布差异目标带来的训练偏好。</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>方向</th><th>加权者</th><th>最怕什么错误</th><th>常见直觉</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>\(D_{\mathrm{KL}}(p_{\mathrm{data}}\|p_\theta)\)</td><td>真实分布</td><td>真实高概率区域被模型给低概率</td><td>mode-covering，最大似然主线</td></tr>
+                <tr><td>\(D_{\mathrm{KL}}(p_\theta\|p_{\mathrm{data}})\)</td><td>模型分布</td><td>模型把概率放到真实低密度区域</td><td>mode-seeking，更保守地贴住部分模式</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>需要注意，这只是理解倾向的地图，不是所有模型行为的完整解释。神经网络容量、优化过程、采样器、数据增强、正则化和评价指标都会影响最终结果。但在读论文时，先问“这个目标用谁来加权、主要惩罚哪种错误”，常常能很快看清作者为什么要换目标函数。</p>
+        </section>
+
+        <section class="article-section">
           <h2>7.5 负对数似然、交叉熵和训练 loss 是什么关系？</h2>
           <p>如果你看深度学习代码，常常不会直接看到“最大似然”四个字，而是看到 loss。最常见的写法是最小化负对数似然：</p>
           <div class="equation">\[
@@ -3303,6 +3371,7 @@ window.siteContent = {
           <p><strong>问题四：似然里的概率密度很小，为什么还要最大化它？</strong>在连续高维空间里，单个样本的密度值可能非常小，这是正常的。最大似然不是关心绝对数值好不好看，而是比较不同参数下训练数据的相对合理性。参数 A 下训练数据密度更高，说明 A 比参数 B 更能解释这些观测。实际计算时我们用对数似然，把很多小数的乘积变成求和，也避免数值下溢。卡住时回到第 5 节和第 6 节。</p>
           <p><strong>问题五：正态分布最大似然的样本均值和样本方差从哪里来？</strong>它们不是经验猜测，而是对正态分布对数似然分别对 \(\mu\) 和 \(\sigma^2\) 求导、令导数为 0 得到的。卡住时回到第 6 节，把每一步求导重新写一遍。</p>
           <p><strong>问题六：KL 散度到底在惩罚什么？</strong>对于 \(D_{\mathrm{KL}}(p_{\mathrm{data}}\|p_\theta)\)，它重点惩罚模型在真实数据高概率区域给出低概率。也就是说，真实世界常见的东西，模型不能说它罕见；真实世界会出现的模式，模型不能完全漏掉。这和生成模型的目标一致：模型必须覆盖真实数据的重要区域。卡住时回到第 7 节，尤其是硬币例子和 KL 展开。</p>
+          <p><strong>问题六（补充）：为什么 KL 的方向会影响模型偏好？</strong>\(D_{\mathrm{KL}}(p_{\mathrm{data}}\|p_\theta)\) 用真实分布加权，所以更怕漏掉真实模式；\(D_{\mathrm{KL}}(p_\theta\|p_{\mathrm{data}})\) 用模型分布加权，所以更怕生成到真实低密度区域。卡住时回到第 7.2 节的双峰分布示意图。</p>
           <p><strong>问题七：最大似然、负对数似然、交叉熵和 KL 散度是不是不同目标？</strong>在本文语境里，它们是同一件事的不同写法。最大似然从样本角度出发，负对数似然是为了写成最小化 loss，交叉熵是分布期望形式，KL 则再减去一个与模型无关的真实分布熵项。卡住时回到第 7 节和第 7.5 节。</p>
 
           <h3>第三轮：能不能迁移到现代生成模型？</h3>
