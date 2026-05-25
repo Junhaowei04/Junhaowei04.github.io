@@ -1372,6 +1372,110 @@ window.siteContent = {
         </section>
 
         <section class="article-section">
+          <h2>5.5 ELBO gap：下界差在哪里？</h2>
+          <p>上一节给出了一个非常关键的等式：</p>
+          <div class="equation">\[
+            \log p_\theta(x)
+            =
+            \mathcal{L}(\theta,\phi;x)
+            +
+            D_{\mathrm{KL}}
+            (q_\phi(z|x)\|p_\theta(z|x)).
+          \]</div>
+          <p>这说明 ELBO 和真实 log likelihood 之间差了一个后验 KL。很多初学者会停在这里，然后误以为“只要最大化 ELBO，就等于最大化 likelihood”。严格地说，还差一点：最大化 ELBO 确实会提高 likelihood 的下界，但这个下界离真实 likelihood 有多远，取决于近似后验 \(q_\phi(z|x)\) 能不能贴近真实后验 \(p_\theta(z|x)\)。</p>
+          <p>把这个差距记作 inference gap：</p>
+          <div class="equation">\[
+            \mathrm{Inference\ Gap}(x)
+            =
+            \log p_\theta(x)
+            -
+            \mathcal{L}(\theta,\phi;x)
+            =
+            D_{\mathrm{KL}}
+            (q_\phi(z|x)\|p_\theta(z|x)).
+          \]</div>
+          <p>如果 \(q_\phi(z|x)\) 正好等于真实后验，那么 gap 为 0，ELBO 就等于真实 log likelihood。但真实后验通常复杂，encoder 又是一个共享网络，所以 gap 往往不为 0。Cremer、Li 和 Duvenaud 在 Inference Suboptimality in Variational Autoencoders 里把这个 gap 进一步拆成两部分：approximation gap 和 amortization gap。</p>
+          <p>先假设我们选定了一个变分分布族 \(\mathcal{Q}\)，比如所有对角高斯。对某个固定样本 \(x\)，如果允许我们在这个分布族里单独寻找最好的近似后验，可以定义：</p>
+          <div class="equation">\[
+            q^*(z|x)
+            =
+            \arg\max_{q\in\mathcal{Q}}
+            \mathcal{L}(\theta,q;x).
+          \]</div>
+          <p>那么可以把总差距写成：</p>
+          <div class="equation">\[
+            \log p_\theta(x)-\mathcal{L}(\theta,\phi;x)
+            =
+            \underbrace{
+            \log p_\theta(x)-\mathcal{L}(\theta,q^*;x)
+            }_{\text{approximation gap}}
+            +
+            \underbrace{
+            \mathcal{L}(\theta,q^*;x)-\mathcal{L}(\theta,\phi;x)
+            }_{\text{amortization gap}}.
+          \]</div>
+          <p><strong>approximation gap</strong> 来自分布族本身不够灵活。即使你愿意为每个样本单独优化最好的 \(q^*(z|x)\)，如果真实后验是弯曲、多峰、强相关的，而 \(\mathcal{Q}\) 只允许对角高斯，那么最好的对角高斯也贴不住真实后验。</p>
+          <p><strong>amortization gap</strong> 来自共享 encoder 的摊销。即使分布族里存在一个很好的 \(q^*(z|x)\)，encoder \(q_\phi(z|x)\) 也未必能对每个样本一次前向传播就输出这个最优近似。它用效率换来了一个额外误差。</p>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 470" role="img" aria-label="VAE 中 log likelihood、最优局部 ELBO 和摊销 ELBO 之间的 gap 分解图">
+              <defs>
+                <linearGradient id="vae-gap-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="vae-gap-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="366" fill="url(#vae-gap-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">ELBO gap 可以拆成两层：分布族不够好，encoder 也可能没学到最优</text>
+              <text class="label-small" x="52" y="98">这张图帮助你区分：VAE 的问题到底来自近似族太弱，还是来自摊销推断没有给出每个样本的最优近似。</text>
+
+              <line class="axis" x1="118" y1="340" x2="470" y2="340"></line>
+              <line class="axis" x1="118" y1="340" x2="118" y2="130"></line>
+              <rect x="178" y="132" width="92" height="208" fill="#d9ecf9" stroke="#8fc5ec"></rect>
+              <rect x="300" y="194" width="92" height="146" fill="#e2f4ec" stroke="#8fd7b2"></rect>
+              <rect x="422" y="242" width="92" height="98" fill="#ffe4d7" stroke="#ffb899"></rect>
+              <line class="guide" x1="148" y1="132" x2="548" y2="132"></line>
+              <line class="guide" x1="148" y1="194" x2="548" y2="194"></line>
+              <line class="guide" x1="148" y1="242" x2="548" y2="242"></line>
+              <text class="label-small label-blue" x="160" y="366">true log p</text>
+              <text class="label-small" x="286" y="366">best local ELBO</text>
+              <text class="label-small label-orange" x="410" y="366">amortized ELBO</text>
+
+              <path d="M 558 194 L 558 132" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-gap-arrow)"></path>
+              <text class="label-small" x="570" y="166">approximation gap</text>
+              <path d="M 558 242 L 558 194" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#vae-gap-arrow)"></path>
+              <text class="label-small" x="570" y="224">amortization gap</text>
+
+              <rect x="650" y="138" width="244" height="190" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="676" y="174">怎么修？</text>
+              <text class="label-small" x="676" y="206">近似族太弱：用更灵活后验</text>
+              <text class="label-small" x="676" y="234">例如 flow posterior 或更强 covariance</text>
+              <text class="label-small" x="676" y="270">摊销误差太大：增强 encoder</text>
+              <text class="label-small" x="676" y="298">或做局部 refinement / iterative inference</text>
+            </svg>
+            <figcaption>自绘图，参考 Cremer、Li 和 Duvenaud 对 VAE inference gap 的拆分：真实 log likelihood 到最优局部 ELBO 的差距来自变分族表达能力，也就是 approximation gap；最优局部 ELBO 到共享 encoder 给出的 ELBO 的差距来自摊销推断，也就是 amortization gap。</figcaption>
+          </figure>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>差距</th><th>来自哪里</th><th>读论文时要问什么</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>inference gap</td><td>ELBO 和真实 \(\log p_\theta(x)\) 的总差距</td><td>这篇论文有没有让下界更接近真实似然？</td></tr>
+                <tr><td>approximation gap</td><td>变分后验族 \(\mathcal{Q}\) 不够表达真实后验</td><td>作者是不是改了 posterior family，比如 normalizing flow、full covariance、mixture posterior？</td></tr>
+                <tr><td>amortization gap</td><td>共享 encoder 没能输出每个样本的最优局部后验</td><td>作者是不是增强 encoder、做 iterative refinement，或者给每个样本额外局部优化？</td></tr>
+                <tr><td>model gap</td><td>即使真实似然最大化，模型族 \(p_\theta(x)\) 本身也可能不含真实分布</td><td>作者是不是改了 decoder、prior、latent hierarchy 或 likelihood？</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>这张表也能解释为什么 VAE 后续论文方向很多。改后验族，主要是在压 approximation gap；改 encoder 或做局部 refinement，主要是在压 amortization gap；改 prior、decoder 或层级潜变量，更多是在改生成模型本身。这样读论文时，你不会只看到一堆新名字，而能判断它到底在修 VAE 框架里的哪一个误差来源。</p>
+        </section>
+
+        <section class="article-section">
           <h2>6. ELBO 推导二：从 Jensen 不等式看下界</h2>
           <p>同一个 ELBO 还可以从 Jensen 不等式直接推出。先把 \(q_\phi(z|x)\) 乘进去再除出来：</p>
           <div class="equation">\[
@@ -2139,6 +2243,7 @@ window.siteContent = {
 
           <h3>第二轮：推导能不能自己复现？</h3>
           <p><strong>检查四：你能否从 KL 分解推出 ELBO？</strong>关键是把 \(p_\theta(z|x)=p_\theta(x|z)p(z)/p_\theta(x)\) 代入 \(D_{\mathrm{KL}}(q_\phi(z|x)\|p_\theta(z|x))\)，然后整理出 \(\log p_\theta(x)=\mathrm{ELBO}+\mathrm{KL}\)。卡住时回到第 5 节。</p>
+          <p><strong>检查四（补充）：你能否区分 inference gap、approximation gap 和 amortization gap？</strong>inference gap 是真实 log likelihood 和当前 ELBO 的总差距；approximation gap 来自变分族本身贴不住真实后验；amortization gap 来自共享 encoder 没有给出每个样本的最优局部近似。卡住时回到第 4.5 节和第 5.5 节。</p>
           <p><strong>检查五：你能否用 Jensen 不等式再推一次 ELBO？</strong>关键是把 \(q_\phi(z|x)\) 乘进去再除出来，把积分写成期望，然后用 \(\log\mathbb{E}[Y]\geq\mathbb{E}[\log Y]\)。卡住时回到第 6 节。</p>
           <p><strong>检查六：你能否推导高斯 KL 闭式？</strong>至少要能在一维情形下写出 \(\log q-\log p\)，再用 \(\mathbb{E}_q[(z-\mu)^2]=\sigma^2\) 和 \(\mathbb{E}_q[z^2]=\mu^2+\sigma^2\)。卡住时回到第 10 节。</p>
 
@@ -2163,6 +2268,7 @@ window.siteContent = {
             <li><a href="https://arxiv.org/abs/1312.6114" target="_blank" rel="noreferrer">Kingma and Welling, Auto-Encoding Variational Bayes, 2013</a></li>
             <li><a href="https://arxiv.org/abs/1401.4082" target="_blank" rel="noreferrer">Rezende, Mohamed, Wierstra, Stochastic Backpropagation and Approximate Inference in Deep Generative Models, 2014</a></li>
             <li><a href="https://arxiv.org/abs/1906.02691" target="_blank" rel="noreferrer">Kingma and Welling, An Introduction to Variational Autoencoders, 2019</a></li>
+            <li><a href="https://arxiv.org/abs/1801.03558" target="_blank" rel="noreferrer">Cremer, Li, Duvenaud, Inference Suboptimality in Variational Autoencoders, 2018</a></li>
             <li><a href="https://arxiv.org/abs/1509.00519" target="_blank" rel="noreferrer">Burda, Grosse, Salakhutdinov, Importance Weighted Autoencoders, 2015</a></li>
             <li><a href="https://openreview.net/forum?id=Sy2fzU9gl" target="_blank" rel="noreferrer">Higgins et al., beta-VAE, 2017</a></li>
             <li><a href="https://lilianweng.github.io/posts/2018-08-12-vae/" target="_blank" rel="noreferrer">Lilian Weng, From Autoencoder to Beta-VAE</a></li>
