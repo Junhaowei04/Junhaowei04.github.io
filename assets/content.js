@@ -47,6 +47,11 @@ window.siteContent = {
           </ol>
           <p>如果 \(D_\phi(x)\) 很接近 1，判别器认为 \(x\) 很像真实样本；如果 \(D_\phi(x)\) 很接近 0，判别器认为 \(x\) 很像生成样本。训练时，判别器希望把真实样本判成 1，把生成样本判成 0；生成器希望自己生成的样本被判别器判成 1。</p>
 
+          <figure class="source-figure">
+            <img src="https://lilianweng.github.io/posts/2017-08-20-gan/GAN.png" alt="GAN architecture with generator and discriminator competing" loading="lazy" />
+            <figcaption>参考图：GAN 的基本对抗结构。生成器把随机噪声映射成样本，判别器同时接收真实样本和生成样本，并把真假判断信号间接反馈给生成器。图片来源：Lilian Weng, From GAN to WGAN。</figcaption>
+          </figure>
+
           <figure class="visual-figure">
             <svg viewBox="0 0 980 430" role="img" aria-label="GAN 生成器和判别器的基本结构">
               <defs>
@@ -807,6 +812,13 @@ window.siteContent = {
           \]</div>
           <p>这里 \(f\) 必须是 1-Lipschitz 函数。WGAN 用一个神经网络 critic \(f_\phi\) 来近似这个函数。注意它叫 critic，而不是 discriminator，因为它不再输出真假概率，也不使用 sigmoid。</p>
           <p>这一步非常关键，值得慢一点拆开。原始 GAN 的判别器 \(D(x)\) 是一个二分类概率：它回答“这个样本像不像真实样本”。WGAN 的 critic \(f(x)\) 不是概率，而是一个标量势函数：它给真实样本高分、给生成样本低分，两者期望差越大，说明当前两类分布在 critic 看来距离越远。1-Lipschitz 约束的作用是防止 critic 通过把函数值任意拉大来作弊；它要求输入移动一点，函数值最多也只能按比例变化。</p>
+
+          <figure class="source-figure">
+            <img src="https://lilianweng.github.io/posts/2017-08-20-gan/WGAN_algorithm.png" alt="WGAN algorithm with critic updates and weight clipping" loading="lazy" />
+            <figcaption>参考图：WGAN 的原始训练算法。和普通 GAN 相比，它多次更新 critic，用 critic 的期望差估计 Wasserstein 距离，并通过 weight clipping 近似维持 Lipschitz 约束。图片来源：Lilian Weng, From GAN to WGAN；图中算法来自 Arjovsky, Chintala, Bottou 的 WGAN 论文。</figcaption>
+          </figure>
+
+          <p>这张算法图要抓住三个变化。第一，判别器变成 critic，它输出实数分数而不是真假概率。第二，critic 通常会更新多步，因为生成器需要一个比较准确的 Wasserstein 估计方向。第三，原始 WGAN 用 weight clipping 近似限制函数族，使 critic 尽量满足 Lipschitz 条件。后面的 WGAN-GP 正是针对第三点做改进：不要粗暴裁剪参数，而是在输入空间里约束梯度。</p>
           <p>可以用一个最小例子看出 WGAN 论文的核心动机。假设真实分布是一个点质量：</p>
           <div class="equation">\[
             p_{\mathrm{data}}=\delta_0,
