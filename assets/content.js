@@ -1203,6 +1203,11 @@ window.siteContent = {
           \]</div>
           <p>这条公式是 VAE 的核心。它说：一个样本 \(x\) 的概率，不是由某一个潜变量决定的，而是所有潜变量路径共同贡献的总概率。每个 \(z\) 先按先验 \(p(z)\) 出现，再按 \(p_\theta(x|z)\) 生成 \(x\)。把这些可能性加起来，就是 \(p_\theta(x)\)。</p>
 
+          <figure class="source-figure">
+            <img src="https://lilianweng.github.io/posts/2018-08-12-vae/VAE-graphical-model.png" alt="VAE graphical model with generative path and variational posterior" loading="lazy" />
+            <figcaption>参考图：VAE 的概率图模型。红色实线表示生成方向 \(p_\theta(z)\) 与 \(p_\theta(x|z)\)，蓝色虚线表示用 \(q_\phi(z|x)\) 近似难算后验 \(p_\theta(z|x)\)。图片来源：Lilian Weng, From Autoencoder to Beta-VAE。</figcaption>
+          </figure>
+
           <figure class="visual-figure">
             <svg viewBox="0 0 980 430" role="img" aria-label="VAE 中先验、encoder、decoder 和 ELBO 的关系示意图">
               <defs>
@@ -2044,6 +2049,64 @@ window.siteContent = {
         </section>
 
         <section class="article-section">
+          <h2>9.7 AEVB 原论文的实验到底在证明什么？</h2>
+          <p>很多人读开山论文时只记住了“VAE = encoder + decoder + KL”，但 Kingma 和 Welling 原文真正要证明的事情更具体：<strong>在后验难算、边缘似然难算、数据量又大的情况下，我们仍然可以用神经网络和随机梯度有效训练一个连续潜变量生成模型。</strong>因此原论文的实验不是单纯展示几张好看的生成图，而是在验证一套推断和优化机制是否真的可用。</p>
+          <p>原论文面对的第一个困难是后验难算。给定一个样本 \(x\)，真实后验为：</p>
+          <div class="equation">\[
+            p_\theta(z|x)
+            =
+            \frac{p_\theta(x|z)p(z)}{p_\theta(x)}.
+          \]</div>
+          <p>分母 \(p_\theta(x)=\int p_\theta(x|z)p(z)\,dz\) 通常无法解析计算，所以真实后验也无法直接算。AEVB 的回答是：不为每个样本单独优化一套变分参数，而是训练一个 recognition model \(q_\phi(z|x)\)，让它直接从 \(x\) 输出近似后验参数。这样新样本来了以后，不需要重新跑一轮局部变分推断，只要前向通过 encoder 即可。</p>
+          <p>第二个困难是数据集很大。全数据 ELBO 是 \(N\) 个样本的和：</p>
+          <div class="equation">\[
+            \mathcal{L}(\theta,\phi;X)
+            =
+            \sum_{i=1}^{N}
+            \mathcal{L}(\theta,\phi;x^{(i)}).
+          \]</div>
+          <p>如果每次更新都扫完整个数据集，深度网络训练会很慢。AEVB 的做法是用 minibatch 估计全数据目标，再用 SGVB estimator 给出可反向传播的随机梯度。于是原论文的 algorithm 不是一个“离线推导”，而是直接对应现代训练循环：抽样本、encoder 输出后验、重参数化采样、decoder 计算似然、加 KL、反向传播。</p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>原论文要解决的问题</th>
+                  <th>AEVB 的回答</th>
+                  <th>读者应当带走的理解</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>边缘似然 \(p_\theta(x)\) 含有高维积分</td>
+                  <td>不直接最大化 \(\log p_\theta(x)\)，而是最大化可估计的 ELBO</td>
+                  <td>ELBO 不是临时损失，而是从最大似然问题推出来的下界</td>
+                </tr>
+                <tr>
+                  <td>真实后验 \(p_\theta(z|x)\) 因分母难算而不可得</td>
+                  <td>用 \(q_\phi(z|x)\) 做摊销近似推断</td>
+                  <td>encoder 的概率意义是近似后验，不只是压缩器</td>
+                </tr>
+                <tr>
+                  <td>从 \(q_\phi(z|x)\) 采样会挡住普通反向传播</td>
+                  <td>把采样写成 \(z=\mu_\phi(x)+\sigma_\phi(x)\odot\epsilon\)</td>
+                  <td>随机性被移到不含参数的 \(\epsilon\)，梯度可以穿过 \(\mu,\sigma\)</td>
+                </tr>
+                <tr>
+                  <td>大数据训练需要随机梯度</td>
+                  <td>用 minibatch SGVB estimator 近似全数据 ELBO</td>
+                  <td>VAE 能训练起来，靠的是“下界 + 摊销推断 + 低方差梯度 + minibatch”四件事同时成立</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p>原论文中的 MNIST、Frey Faces 等实验可以这样读：作者不是在说“VAE 的图片质量已经超过所有模型”，而是在说这套算法可以在真实数据上学习有意义的潜变量模型，并且相对于当时的 wake-sleep、Monte Carlo EM 等方法，能够用更直接的随机梯度方式优化一个清晰的变分下界。论文里常展示二维潜空间的可视化和采样结果，是为了说明 \(z\) 不只是训练时的辅助变量，它确实形成了一个可连续移动、可采样的表示空间。</p>
+          <p>这也解释了为什么 VAE 生成图有时会显得模糊。原论文的核心贡献不是追求感官上最锐利的图像，而是给出了一个有明确似然目标、可近似评估、可推断潜变量、可端到端训练的生成框架。后来很多工作，如 IWAE、normalizing flow posterior、β-VAE、VQ-VAE、latent diffusion 的 autoencoder 部分，都是沿着这条框架继续改：让下界更紧、后验更强、潜空间更有结构、decoder 更适合具体数据。</p>
+          <div class="paper-note">如果读完本文后再看 AEVB 原文，可以重点检查四个问题：它怎样绕开 \(p_\theta(x)\) 的积分？它怎样用 \(q_\phi(z|x)\) 摊销后验推断？它怎样用 reparameterization trick 得到可用梯度？它的实验是在验证生成图好看，还是在验证这套随机变分学习算法确实能训练连续潜变量模型？能回答这四个问题，基本就抓住了开山论文的精华。</div>
+        </section>
+
+        <section class="article-section">
           <h2>10. 高斯 KL 的闭式公式</h2>
           <p>VAE 最常见设定是：</p>
           <div class="equation">\[
@@ -2495,6 +2558,7 @@ window.siteContent = {
           <h3>第三轮：训练和代码能否对应？</h3>
           <p><strong>检查七：你能否解释重参数化技巧为什么必要？</strong>它把 \(z\sim q_\phi(z|x)\) 改写成 \(z=\mu_\phi(x)+\sigma_\phi(x)\odot\epsilon\)，让随机性来自不依赖参数的 \(\epsilon\)，梯度可以穿过 \(\mu,\sigma\)。卡住时回到第 9 节。</p>
           <p><strong>检查八：你能否解释开山论文里的 SGVB estimator 和 AEVB algorithm？</strong>SGVB 是重参数化后的随机梯度 ELBO 估计器，AEVB 是把这个估计器用于 recognition model 和 generative model 的端到端训练算法。最好还能说清楚 minibatch 估计里的 \(N/M\) 从哪里来，以及为什么代码里有时会省略这个常数。卡住时回到第 9.5 节。</p>
+          <p><strong>检查八（补充）：你能否解释 AEVB 原论文的实验究竟在验证什么？</strong>不要只说“展示了生成图片”。更准确的回答是：实验验证了在后验和边缘似然都难算的连续潜变量模型中，摊销推断、重参数化梯度和 minibatch SGVB 估计器可以实际训练模型，并学习到可采样、可插值的潜空间。卡住时回到第 9.7 节。</p>
           <p><strong>检查九：你能否解释为什么 pathwise gradient 通常比 score-function estimator 更适合高斯 VAE？</strong>前者让梯度穿过可微采样路径，利用 \(f(z)\) 对 \(z\) 的局部导数；后者更通用但常常方差更大。卡住时回到第 9.6 节。</p>
           <p><strong>检查十：你能否解释 reconstruction loss 为什么有时是 BCE、有时是 MSE？</strong>它取决于 decoder likelihood。Bernoulli likelihood 对应 BCE，固定方差 Gaussian likelihood 对应 MSE。卡住时回到第 8 节。</p>
           <p><strong>检查十一：你能否把代码里的 KL 公式和数学 KL 对上？</strong>代码常用 \(-\frac{1}{2}\sum(1+\mathrm{logvar}-\mu^2-\exp(\mathrm{logvar}))\)，它就是高斯 KL 闭式的 log variance 写法。卡住时回到第 10 节和第 11 节。</p>
