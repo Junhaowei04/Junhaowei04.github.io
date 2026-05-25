@@ -4019,8 +4019,154 @@ window.siteContent = {
             \right\|^2
             \right].
           \]</div>
-          <p>直觉是：同一个 \(x_t\) 可能由很多 \(x_0\) 产生，训练时模型看见大量这样的配对后，会学到这些条件方向的平均效果。这个平均方向正是把样本推回高概率区域的边缘 score。</p>
-          <div class="insight-box">所以“预测噪声”不是一个随便挑的工程技巧。它是用一个容易构造的监督信号，间接学习每个噪声等级上的 score。</div>
+          <p>直觉是：同一个 \(x_t\) 可能由很多 \(x_0\) 产生，训练时模型看见大量这样的配对后，会学到这些条件方向的平均效果。这个平均方向正是把样本推回高概率区域的边缘 score。下面把这句话完全写成公式，避免它只停留在“好像有道理”的层面。</p>
+
+          <h3>8.1 条件 score 为什么能训练边缘 score？</h3>
+          <p>先固定一个噪声时刻 \(t\)。为了让符号轻一点，暂时把 \(x_t\) 写成 \(x\)，把前向核 \(q(x_t|x_0)\) 写成 \(q_t(x|x_0)\)。边缘分布是所有干净样本加噪后的混合：</p>
+          <div class="equation">\[
+            p_t(x)
+            =
+            \int q_t(x|x_0)p_{\mathrm{data}}(x_0)\,dx_0.
+          \]</div>
+          <p>我们要的是边缘 score \(\nabla_x\log p_t(x)\)。第一步先对 \(p_t(x)\) 求梯度。这里梯度是对当前 noisy sample \(x\) 求的，不是对 \(x_0\) 求的；因此 \(p_{\mathrm{data}}(x_0)\) 在积分里只是权重：</p>
+          <div class="equation">\[
+            \nabla_x p_t(x)
+            =
+            \int \nabla_x q_t(x|x_0)p_{\mathrm{data}}(x_0)\,dx_0.
+          \]</div>
+          <p>接下来使用一个非常基础但关键的恒等式：</p>
+          <div class="equation">\[
+            \nabla_x q_t(x|x_0)
+            =
+            q_t(x|x_0)\nabla_x\log q_t(x|x_0).
+          \]</div>
+          <p>为什么成立？因为 \(\nabla_x\log q=\frac{1}{q}\nabla_x q\)，两边乘以 \(q\) 就得到上式。把它代回去：</p>
+          <div class="equation">\[
+            \nabla_x p_t(x)
+            =
+            \int
+            q_t(x|x_0)
+            \nabla_x\log q_t(x|x_0)
+            p_{\mathrm{data}}(x_0)\,dx_0.
+          \]</div>
+          <p>现在除以 \(p_t(x)\)，就得到 log 密度的梯度：</p>
+          <div class="equation">\[
+            \nabla_x\log p_t(x)
+            =
+            \frac{
+              \int
+              q_t(x|x_0)
+              \nabla_x\log q_t(x|x_0)
+              p_{\mathrm{data}}(x_0)\,dx_0
+            }{
+              p_t(x)
+            }.
+          \]</div>
+          <p>分母 \(p_t(x)\) 也可以写成 \(\int q_t(x|x_0)p_{\mathrm{data}}(x_0)\,dx_0\)。因此上式其实就是在 \(x_t=x\) 这个条件下，对所有可能的 \(x_0\) 做后验加权平均：</p>
+          <div class="equation">\[
+            \nabla_x\log p_t(x)
+            =
+            \mathbb{E}
+            \left[
+              \nabla_x\log q_t(x|x_0)
+              \mid x_t=x
+            \right].
+          \]</div>
+          <p>这就是 denoising score matching 最重要的一句话：<strong>边缘 score 是条件 score 的条件期望。</strong>不是把某一个 \(x_0\) 对应的去噪方向当成最终答案，而是在同一个 noisy 位置 \(x\) 下，把所有可能来源的条件方向按后验概率平均起来。</p>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="多个干净样本的条件 score 平均成同一个 noisy 位置的边缘 score">
+              <defs>
+                <marker id="score-average-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+                  <path d="M0,0 L8,3 L0,6 Z" fill="#2f80ed"></path>
+                </marker>
+                <marker id="score-average-arrow-soft" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+                  <path d="M0,0 L8,3 L0,6 Z" fill="#8aa0b6"></path>
+                </marker>
+              </defs>
+              <rect x="70" y="74" width="840" height="282" fill="#f6f9fc" stroke="#d7e2ec"></rect>
+              <text x="96" y="112" class="label">同一个 noisy sample 可能来自很多干净样本</text>
+              <text x="96" y="138" class="label-small">训练时知道配对来源，生成时只知道当前位置</text>
+              <circle cx="210" cy="275" r="11" class="dot-real"></circle>
+              <circle cx="255" cy="185" r="11" class="dot-real"></circle>
+              <circle cx="315" cy="300" r="11" class="dot-real"></circle>
+              <text x="170" y="323" class="label-small">候选 x0 来源</text>
+              <circle cx="540" cy="224" r="16" fill="#ff6b3d"></circle>
+              <text x="515" y="260" class="label-small">固定 xt=x</text>
+              <line x1="210" y1="275" x2="520" y2="229" stroke="#8aa0b6" stroke-width="3" marker-end="url(#score-average-arrow-soft)"></line>
+              <line x1="255" y1="185" x2="520" y2="218" stroke="#8aa0b6" stroke-width="3" marker-end="url(#score-average-arrow-soft)"></line>
+              <line x1="315" y1="300" x2="520" y2="235" stroke="#8aa0b6" stroke-width="3" marker-end="url(#score-average-arrow-soft)"></line>
+              <text x="360" y="166" class="label-small">条件 score：知道 x0 后的局部去噪方向</text>
+              <line x1="556" y1="224" x2="720" y2="205" stroke="#2f80ed" stroke-width="5" marker-end="url(#score-average-arrow)"></line>
+              <text x="735" y="207" class="label label-blue">平均方向</text>
+              <text x="735" y="235" class="label-small">边缘 score</text>
+              <path d="M176 352 C260 372, 392 372, 520 352 C635 334, 752 333, 842 353" fill="none" stroke="#16a394" stroke-width="3" stroke-dasharray="8 8"></path>
+              <text x="650" y="337" class="label-small">noisy distribution 的高密度区域</text>
+            </svg>
+            <figcaption>自绘图：条件 score 是“知道来源 \(x_0\)”时的方向；边缘 score 是“只知道 \(x_t=x\)”时对这些方向的后验平均。</figcaption>
+          </figure>
+
+          <p>现在再看训练目标为什么会自动学到这个条件期望。令</p>
+          <div class="equation">\[
+            U=\nabla_x\log q_t(x|x_0),
+            \qquad
+            a=s_\theta(x,t).
+          \]</div>
+          <p>固定 \(x_t=x\) 后，网络输出 \(a\) 是一个确定向量，而 \(U\) 仍然随机，因为 \(x_0\) 的可能来源还没有确定。平方损失的条件期望可以分解成：</p>
+          <div class="equation">\[
+            \mathbb{E}\left[\|a-U\|^2\mid x_t=x\right]
+            =
+            \left\|a-\mathbb{E}[U\mid x_t=x]\right\|^2
+            +
+            \mathbb{E}\left[
+              \left\|U-\mathbb{E}[U\mid x_t=x]\right\|^2
+              \mid x_t=x
+            \right].
+          \]</div>
+          <p>这就是平方损失的“条件期望投影”性质。右边第二项是 \(U\) 自己的条件方差，和网络输出 \(a\) 无关；能被优化的只有第一项。因此最优网络必须取：</p>
+          <div class="equation">\[
+            s_\theta^*(x,t)
+            =
+            \mathbb{E}[U\mid x_t=x]
+            =
+            \nabla_x\log p_t(x).
+          \]</div>
+          <p>这一步非常重要：训练数据给我们的监督标签是条件 score，但平方损失在固定输入 \(x_t=x\) 后会把所有可能标签平均起来，于是最优预测器就是边缘 score。换句话说，模型不是在记住某一个配对的去噪方向，而是在学习“当我只看到这个 noisy sample 时，平均应该往哪里走”。</p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>对象</th>
+                  <th>训练时是否可直接构造</th>
+                  <th>含义</th>
+                  <th>和噪声预测的关系</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>条件 score \(\nabla_{x_t}\log q(x_t|x_0)\)</td>
+                  <td>可以，因为 \(x_0\)、\(x_t\)、\(\epsilon\) 都是训练时自己采样出来的</td>
+                  <td>知道干净来源后，当前点应该往哪个方向回到该来源附近</td>
+                  <td>\(-\epsilon/\sqrt{1-\bar{\alpha}_t}\)</td>
+                </tr>
+                <tr>
+                  <td>边缘 score \(\nabla_{x_t}\log p_t(x_t)\)</td>
+                  <td>不能直接算，因为 \(p_{\mathrm{data}}\) 未知</td>
+                  <td>只知道 noisy sample 时，所有可能来源给出的平均去噪方向</td>
+                  <td>网络训练的真正目标</td>
+                </tr>
+                <tr>
+                  <td>噪声预测 \(\epsilon_\theta(x_t,t)\)</td>
+                  <td>可以，因为前向加噪时真实 \(\epsilon\) 已知</td>
+                  <td>预测这次加噪里混入了哪份标准高斯噪声</td>
+                  <td>\(s_\theta(x_t,t)\approx-\epsilon_\theta(x_t,t)/\sqrt{1-\bar{\alpha}_t}\)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="insight-box">所以“预测噪声”不是一个随便挑的工程技巧。它先把条件 score 写成一个容易构造的监督信号，再借助平方损失的条件期望性质，间接学习每个噪声等级上的边缘 score。DDPM、denoising score matching 和 score-based model 在这里接上了同一条理论线。</div>
 
         </section>
 
@@ -4893,6 +5039,7 @@ window.siteContent = {
             -\frac{\epsilon}{\sqrt{1-\bar{\alpha}_t}}.
           \]</div>
           <p>并且能解释这只是条件 score，真正生成需要边缘 score，而 denoising score matching 正是用条件监督学习边缘方向。卡住时回到第 8 节。</p>
+          <p><strong>检查六（补充）：你能否自己证明条件 score 的平方损失为什么会学到边缘 score？</strong>关键是先把 \(p_t(x)=\int q_t(x|x_0)p_{\mathrm{data}}(x_0)dx_0\) 对 \(x\) 求梯度，再用 \(\nabla q=q\nabla\log q\)，得到 \(\nabla_x\log p_t(x)=\mathbb{E}[\nabla_x\log q_t(x|x_0)\mid x_t=x]\)。然后用平方损失的条件期望投影说明最优预测器正是这个条件期望。卡住时回到第 8.1 节。</p>
 
           <h3>第三轮：能不能带着框架读新论文？</h3>
           <p><strong>检查七：你能否解释 SDE、ODE、Flow Matching 的共同点？</strong>它们都在描述概率分布如何从噪声端移动到数据端。SDE 用随机过程和 score 修正反向漂移，probability flow ODE 用确定性速度保持同样边缘分布，Flow Matching 直接回归满足连续性方程的速度场。进一步地，你还应该能说清楚 conditional velocity 为什么可以训练 marginal velocity：训练时知道条件路径，生成时只用当前位置下的平均速度。卡住时回到第 11 节和第 12 节。</p>
