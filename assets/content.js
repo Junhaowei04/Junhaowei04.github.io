@@ -4063,6 +4063,200 @@ window.siteContent = {
           <p>这和 denoising score matching 的味道很像：训练监督来自条件对象，但模型最终学到的是边缘对象。Diffusion 里是条件 score 到边缘 score；Flow Matching 里是条件速度到边缘速度。</p>
           <p>DiffusionFlow 的文章强调：在高斯源分布和合适 schedule 下，diffusion 与 flow matching 可以相互转换。它们常常不是“谁替代谁”的关系，而是同一类分布运输思想的不同参数化。</p>
 
+          <h3>Conditional Flow Matching 的核心定理：为什么条件速度能训练边缘速度？</h3>
+          <p>这一段是读 Flow Matching 开山论文和 Cambridge MLG blog 时最重要的桥。直觉上我们已经说过：训练时知道条件路径，生成时只能用边缘速度。现在要证明的是：用条件速度 \(u_t(x|z)\) 做监督，确实不会把模型训练到错误方向上。</p>
+          <p>先假设给定条件 \(z\) 时，条件路径 \(p_t(x|z)\) 和条件速度场 \(u_t(x|z)\) 满足连续性方程：</p>
+          <div class="equation">\[
+            \frac{\partial p_t(x|z)}{\partial t}
+            =
+            -
+            \nabla_x\cdot
+            \left(
+            p_t(x|z)u_t(x|z)
+            \right).
+          \]</div>
+          <p>这句话的意思是：在每条条件路径内部，概率质量不是凭空产生或消失，而是被速度场 \(u_t\) 搬运。现在把条件变量积分掉，得到边缘路径：</p>
+          <div class="equation">\[
+            p_t(x)=\int p_t(x|z)p(z)\,dz.
+          \]</div>
+          <p>我们希望找到一个边缘速度场 \(v_t(x)\)，使得边缘分布也满足连续性方程：</p>
+          <div class="equation">\[
+            \frac{\partial p_t(x)}{\partial t}
+            =
+            -
+            \nabla_x\cdot
+            \left(
+            p_t(x)v_t(x)
+            \right).
+          \]</div>
+          <p>把边缘路径对时间求导：</p>
+          <div class="equation">\[
+            \frac{\partial p_t(x)}{\partial t}
+            =
+            \int
+            \frac{\partial p_t(x|z)}{\partial t}
+            p(z)\,dz.
+          \]</div>
+          <p>代入条件连续性方程：</p>
+          <div class="equation">\[
+            \frac{\partial p_t(x)}{\partial t}
+            =
+            -
+            \int
+            \nabla_x\cdot
+            \left(
+            p_t(x|z)u_t(x|z)
+            \right)
+            p(z)\,dz.
+          \]</div>
+          <p>在通常的光滑性条件下，可以把散度算子移到积分外面：</p>
+          <div class="equation">\[
+            \frac{\partial p_t(x)}{\partial t}
+            =
+            -
+            \nabla_x\cdot
+            \left(
+            \int
+            p_t(x|z)u_t(x|z)p(z)\,dz
+            \right).
+          \]</div>
+          <p>如果定义：</p>
+          <div class="equation">\[
+            v_t(x)
+            =
+            \frac{
+            \int p_t(x|z)u_t(x|z)p(z)\,dz
+            }{
+            \int p_t(x|z)p(z)\,dz
+            },
+          \]</div>
+          <p>也就是：</p>
+          <div class="equation">\[
+            v_t(x)=
+            \mathbb{E}
+            \left[
+            u_t(x|z)\mid x_t=x
+            \right],
+          \]</div>
+          <p>那么分子就等于 \(p_t(x)v_t(x)\)。因此：</p>
+          <div class="equation">\[
+            \frac{\partial p_t(x)}{\partial t}
+            =
+            -
+            \nabla_x\cdot
+            \left(
+            p_t(x)v_t(x)
+            \right).
+          \]</div>
+          <p>这就证明了第一件事：条件速度的条件平均 \(v_t(x)\)，确实是推动边缘路径 \(p_t(x)\) 的合法速度场。因此生成时解 ODE：</p>
+          <div class="equation">\[
+            \frac{dx_t}{dt}=v_t(x_t)
+          \]</div>
+          <p>就会沿着我们设计的边缘 probability path 移动概率质量。</p>
+
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 470" role="img" aria-label="Conditional Flow Matching 定理从条件连续性方程推出边缘连续性方程">
+              <defs>
+                <linearGradient id="cfm-theorem-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="cfm-theorem-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="366" fill="url(#cfm-theorem-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">CFM 核心定理：条件路径先守恒，积分后边缘路径仍守恒</text>
+              <text class="label-small" x="52" y="98">每条条件路径都有自己的速度；把条件变量平均掉后，平均速度就是生成时要用的边缘速度。</text>
+
+              <rect x="68" y="146" width="196" height="94" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="92" y="176">条件路径</text>
+              <text class="label-small" x="92" y="204">p_t(x | z)</text>
+              <text class="label-small" x="92" y="226">speed u_t(x | z)</text>
+              <path d="M 264 193 L 332 193" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#cfm-theorem-arrow)"></path>
+
+              <rect x="348" y="146" width="220" height="94" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="376" y="176">对 z 积分</text>
+              <text class="label-small" x="376" y="204">p_t(x) = integral p_t(x|z)p(z) dz</text>
+              <text class="label-small" x="376" y="226">sum all conditional mass fluxes</text>
+              <path d="M 568 193 L 636 193" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#cfm-theorem-arrow)"></path>
+
+              <rect x="652" y="146" width="236" height="94" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="680" y="176">边缘速度</text>
+              <text class="label-small" x="680" y="204">v_t(x) = E[u_t(x|z) | x_t=x]</text>
+              <text class="label-small" x="680" y="226">used by generation ODE</text>
+
+              <path class="curve-soft" d="M 112 306 C 232 276, 334 276, 454 306 C 574 336, 714 336, 846 288"></path>
+              <circle class="dot-model" cx="112" cy="306" r="7"></circle>
+              <circle class="dot-model" cx="454" cy="306" r="7"></circle>
+              <circle class="dot-real" cx="846" cy="288" r="7"></circle>
+              <path d="M 454 306 L 520 316" fill="none" stroke="#b8c5d1" stroke-width="2" marker-end="url(#cfm-theorem-arrow)"></path>
+              <path d="M 454 306 L 536 286" fill="none" stroke="#b8c5d1" stroke-width="2" marker-end="url(#cfm-theorem-arrow)"></path>
+              <path d="M 454 306 L 548 302" fill="none" stroke="#2f80ed" stroke-width="4" marker-end="url(#cfm-theorem-arrow)"></path>
+              <text class="label-small label-orange" x="392" y="354">同一个 x_t 附近可能有多条条件速度</text>
+              <text class="label-small label-blue" x="612" y="354">模型应该学条件平均方向</text>
+            </svg>
+            <figcaption>自绘图：Conditional Flow Matching 的核心不是“随便回归一条线性插值速度”，而是一个连续性方程结论。只要条件路径 \(p_t(x|z)\) 被条件速度 \(u_t(x|z)\) 正确运输，把条件变量积分掉后，边缘路径 \(p_t(x)\) 也会被条件平均速度 \(v_t(x)\) 正确运输。</figcaption>
+          </figure>
+
+          <p>第二件事是训练目标为什么可以用条件速度，而不是必须先算出难算的边缘速度。理想的 Flow Matching loss 是：</p>
+          <div class="equation">\[
+            L_{\mathrm{FM}}(\theta)
+            =
+            \mathbb{E}_{t,x\sim p_t}
+            \left[
+            \|v_\theta(x,t)-v_t(x)\|^2
+            \right].
+          \]</div>
+          <p>问题是 \(v_t(x)\) 正是我们难以直接计算的边缘速度。Conditional Flow Matching 改成训练：</p>
+          <div class="equation">\[
+            L_{\mathrm{CFM}}(\theta)
+            =
+            \mathbb{E}_{t,z,x\sim p_t(\cdot|z)}
+            \left[
+            \|v_\theta(x,t)-u_t(x|z)\|^2
+            \right].
+          \]</div>
+          <p>为什么这不会改变最优解？固定某个 \(t\) 和当前位置 \(x\)，把随机变量 \(U=u_t(x|z)\) 看成所有可能条件速度。平方损失有一个投影恒等式：</p>
+          <div class="equation">\[
+            \mathbb{E}
+            \left[
+            \|a-U\|^2\mid x_t=x
+            \right]
+            =
+            \|a-\mathbb{E}[U\mid x_t=x]\|^2
+            +
+            \mathbb{E}
+            \left[
+            \|U-\mathbb{E}[U\mid x_t=x]\|^2
+            \mid x_t=x
+            \right].
+          \]</div>
+          <p>这里 \(a\) 可以理解成网络输出 \(v_\theta(x,t)\)。右边第二项和 \(a\) 无关，所以最小化左边时，最优的 \(a\) 必然是：</p>
+          <div class="equation">\[
+            a^*
+            =
+            \mathbb{E}[U\mid x_t=x]
+            =
+            v_t(x).
+          \]</div>
+          <p>这就是 CFM 的训练魔法：我们用可构造的条件速度做监督，但平方损失会自动把网络推向条件平均，也就是生成时真正需要的边缘速度。读论文时看到这个结论，不要把它当成经验技巧；它本质上是条件期望作为均方误差最优预测器的结果。</p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>对象</th><th>训练时能不能直接拿到</th><th>生成时用不用</th><th>核心作用</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>条件路径 \(p_t(x|z)\)</td><td>能，来自我们设计的插值或高斯条件路径</td><td>不用，因为生成时不知道 \(z\)</td><td>提供可采样的训练样本 \(x_t\)</td></tr>
+                <tr><td>条件速度 \(u_t(x|z)\)</td><td>能，通常有闭式公式</td><td>不用直接使用</td><td>作为监督信号训练网络</td></tr>
+                <tr><td>边缘路径 \(p_t(x)\)</td><td>通常只能采样，难以写出密度</td><td>需要沿它从源分布走到数据分布</td><td>定义真正的生成路径</td></tr>
+                <tr><td>边缘速度 \(v_t(x)\)</td><td>通常难以直接计算</td><td>需要，用于 ODE 采样</td><td>网络最终要学到的速度场</td></tr>
+                <tr><td>CFM loss</td><td>能计算</td><td>训练后不再使用 loss</td><td>用条件监督逼近边缘速度</td></tr>
+              </tbody>
+            </table>
+          </div>
+
           <figure class="visual-figure">
             <svg viewBox="0 0 980 520" role="img" aria-label="Flow Matching 中条件路径速度如何平均成边缘速度场的机制图">
               <defs>
@@ -4387,6 +4581,7 @@ window.siteContent = {
 
           <h3>第三轮：能不能带着框架读新论文？</h3>
           <p><strong>检查七：你能否解释 SDE、ODE、Flow Matching 的共同点？</strong>它们都在描述概率分布如何从噪声端移动到数据端。SDE 用随机过程和 score 修正反向漂移，probability flow ODE 用确定性速度保持同样边缘分布，Flow Matching 直接回归满足连续性方程的速度场。进一步地，你还应该能说清楚 conditional velocity 为什么可以训练 marginal velocity：训练时知道条件路径，生成时只用当前位置下的平均速度。卡住时回到第 11 节和第 12 节。</p>
+          <p><strong>检查七（补充）：你能否自己推一遍 CFM loss 为什么和 FM loss 有同一个最优速度场？</strong>关键是固定 \(x_t=x\) 后，把条件速度 \(u_t(x|z)\) 看成随机变量 \(U\)，再使用平方损失投影恒等式：最优预测器是条件期望 \(\mathbb{E}[U|x_t=x]\)。如果这里卡住，回到第 12 节的 Conditional Flow Matching 核心定理，重点看“条件连续性方程积分成边缘连续性方程”和“平方损失条件期望最优”这两步。</p>
           <p><strong>检查八：你能否看到一篇新论文时，立刻定位它改变的是哪一层？</strong>有些论文改变噪声 schedule，有些改变网络输出参数化，有些改变采样器，有些把像素空间换成 latent space，有些把 score 语言换成 flow 语言。只要能把创新点放回“路径、目标、参数化、采样”这四个位置，就不会被新名词牵着走。卡住时回到第 14 节、第 15 节和第 17 节。</p>
           <p><strong>检查九：你能否把公式翻译成口头解释？</strong>比如 \(\bar{\alpha}_t\) 不是一个神秘符号，而是原始信号保留比例；\(\tilde{\mu}_t\) 不是凭空出现的均值，而是由 \(x_t\) 和 \(x_0\) 两个信息源按可靠性加权；score 不是抽象梯度，而是往高概率区域移动的方向。能做到这一点，说明公式已经变成理解，而不是记忆负担。卡住时回到第 4.5 节、第 6 节和第 8 节。</p>
           <p><strong>检查十：你能否解释为什么采样慢、为什么可以加速？</strong>慢是因为模型沿着很多离散噪声等级逐步移动，每一步只做局部修正；加速则来自更好的时间步选择、更稳定的 ODE/SDE 求解器、或者更直接的路径学习。这样看 DDIM、DPM-Solver、EDM、consistency model 时，就能明白它们大多是在改进“怎么走这条路”。卡住时回到第 10 节、第 11 节和第 12 节。</p>
