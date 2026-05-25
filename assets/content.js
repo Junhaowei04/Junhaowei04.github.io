@@ -269,9 +269,43 @@ window.siteContent = {
           \]</div>
           <p>现在结论非常清楚：如果判别器足够强并且总能达到最优，那么训练生成器最小化原始 GAN 目标，等价于最小化真实分布和生成分布之间的 JS 散度。</p>
 
-          <figure class="source-figure">
-            <img src="https://cs.stanford.edu/people/karpathy/gan/gan.png" alt="GAN 训练中真实分布、生成分布和判别器的可视化" loading="lazy" />
-            <figcaption>参考图：一维 GAN 训练可视化。可以把蓝色/绿色分布理解为真实分布与生成分布，把判别器理解为给生成器提供方向信号的分类器。图片来源：Andrej Karpathy, GAN demo。</figcaption>
+          <figure class="visual-figure">
+            <svg viewBox="0 0 980 430" role="img" aria-label="把最优判别器代回后，GAN 生成器最小化 JS 散度并在真实分布处达到均衡">
+              <defs>
+                <linearGradient id="gan-js-panel" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"></stop>
+                  <stop offset="100%" stop-color="#eef5fa" stop-opacity="0.76"></stop>
+                </linearGradient>
+                <marker id="gan-js-arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#5d6b7a"></path>
+                </marker>
+              </defs>
+              <rect x="24" y="30" width="932" height="328" fill="url(#gan-js-panel)" stroke="#d7e1ea"></rect>
+              <text class="label" x="52" y="70">把 D*_G 代回去以后，生成器到底在最小化什么？</text>
+              <text class="label-small" x="52" y="98">不是在追某一张图，而是在压低 D_JS(p_data || p_g)，直到 p_g 覆盖真实数据分布。</text>
+
+              <line class="axis" x1="70" y1="290" x2="404" y2="290"></line>
+              <line class="axis" x1="70" y1="290" x2="70" y2="130"></line>
+              <path class="curve-real" d="M 82 282 C 116 268, 138 168, 188 144 C 238 120, 262 254, 316 258 C 360 260, 378 184, 396 178"></path>
+              <path class="curve-model" d="M 82 284 C 132 282, 156 240, 214 230 C 262 222, 292 152, 344 144 C 378 140, 390 220, 398 252"></path>
+              <text class="label-small label-blue" x="108" y="136">p_data</text>
+              <text class="label-small label-orange" x="318" y="136">p_g</text>
+              <text class="label-small" x="118" y="320">当前 p_g 与真实分布仍有偏差</text>
+
+              <path d="M 430 214 L 516 214" fill="none" stroke="#5d6b7a" stroke-width="1.8" marker-end="url(#gan-js-arrow)"></path>
+              <text class="label-small" x="424" y="190">最优判别器给出密度比</text>
+              <text class="label-small" x="424" y="246">代回目标得到 JS 散度</text>
+
+              <rect x="546" y="124" width="352" height="176" fill="#ffffff" stroke="#d7e1ea"></rect>
+              <text class="label" x="574" y="164">V(D*_G,G) = -log 4 + 2 D_JS</text>
+              <text class="label-small" x="574" y="200">D_JS >= 0，所以目标的理论下界是 -log 4</text>
+              <text class="label-small" x="574" y="232">达到下界时 p_g = p_data</text>
+              <text class="label-small" x="574" y="264">此时 D*_G(x)=1/2，判别器无法区分真假</text>
+
+              <path class="curve-soft" d="M 116 350 C 270 330, 426 330, 594 350 C 692 362, 798 360, 876 330"></path>
+              <text class="label-small label-blue" x="118" y="382">训练的理想方向：把生成分布整体推向真实分布，而不是只优化少数漂亮样本</text>
+            </svg>
+            <figcaption>自绘图：Goodfellow 原论文的核心闭环可以浓缩成这一步。最优判别器把两类样本的二分类问题变成密度比估计；把它代回生成器目标后，得到 \(-\log4+2D_{\mathrm{JS}}(p_{\mathrm{data}}\|p_g)\)。因此理想情况下，GAN 的均衡点就是 \(p_g=p_{\mathrm{data}}\)，而不是“生成器骗过某个固定判别器”这么简单。</figcaption>
           </figure>
         </section>
 
@@ -505,6 +539,23 @@ window.siteContent = {
             <img src="https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/website-images/master/tutorials/source_zh_cn/generative/images/train_test.gif" alt="GAN 训练过程中生成样本逐步改善的动图" loading="lazy" />
             <figcaption>参考动图：GAN 训练过程中生成样本逐步变清晰。读这类动图时要注意：视觉质量改善背后，是 \(p_g\) 在判别器信号推动下逐渐靠近 \(p_{\mathrm{data}}\)。图片来源：MindSpore GAN tutorial。</figcaption>
           </figure>
+
+          <p>把 Goodfellow 原论文的训练算法翻译成实现语言，可以得到下面这个对照。初学者写代码时最容易错的地方，不是公式本身，而是“这一轮到底固定谁、更新谁”。</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>原论文算法动作</th><th>代码里的对象</th><th>为什么要这样做</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>采样真实数据 \(x\)</td><td>一个真实 minibatch</td><td>给判别器正样本，让它知道 \(p_{\mathrm{data}}\) 附近长什么样。</td></tr>
+                <tr><td>采样噪声 \(z\)</td><td>latent noise batch</td><td>噪声经过 \(G_\theta\) 后诱导出当前生成分布 \(p_g\)。</td></tr>
+                <tr><td>更新判别器 \(D\)</td><td>优化 \(L_D\)，假样本通常 detach</td><td>这一轮只学习“真假如何分开”，不让生成器参数被这一步改动。</td></tr>
+                <tr><td>再采样噪声 \(z\)</td><td>新的 latent noise batch</td><td>生成器更新需要新的假样本来估计梯度，减少对上一批样本的偶然依赖。</td></tr>
+                <tr><td>更新生成器 \(G\)</td><td>优化 \(L_G\)，冻结判别器参数</td><td>判别器作为可微损失函数提供方向，梯度穿过 \(D_\phi\) 回到 \(G_\theta\)。</td></tr>
+                <tr><td>重复 \(k\) 次判别器更新</td><td>常见于 WGAN 等变体</td><td>判别器或 critic 太弱时，给生成器的分布差异信号会不可靠。</td></tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
         <section class="article-section">
@@ -2323,6 +2374,22 @@ window.siteContent = {
           <p><strong>第五步，优化参数。</strong>对于一维正态分布，最大似然有解析解；对于神经网络生成模型，通常用梯度下降。优化算法本身不是生成模型的本质，它只是找到好参数的工具。</p>
           <p><strong>第六步，使用模型。</strong>训练完成后，我们可以从模型中采样，也可以用模型做概率评价、异常检测、缺失数据补全或条件生成。模型的价值来自它学到的分布，而不仅仅是生成一张好看的图。</p>
           <p>这六步看起来朴素，但非常通用。后续学 Diffusion 时，也可以这样对应：数据对象是图片或 latent；真实分布是图片数据分布；模型族是由 U-Net/Transformer 参数化的反向过程或 score；训练目标是噪声预测或变分目标；优化用梯度下降；使用时从噪声采样并逐步生成。</p>
+          <p>把后面几篇文章放回这套流程里，就会发现它们并不是互不相干的模型名字，而是围绕“如何让模型分布靠近真实分布”给出的不同工程化方案。</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>路线</th><th>想逼近的对象</th><th>为什么不直接做最大似然</th><th>最后变成什么训练信号</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>显式似然模型</td><td>\(p_\theta(x)\)</td><td>如果密度可算，就可以直接最大化 \(\log p_\theta(x)\)。</td><td>负对数似然、交叉熵或 MSE 等可直接优化的 loss。</td></tr>
+                <tr><td>VAE</td><td>\(p_\theta(x)=\int p_\theta(x|z)p(z)dz\)</td><td>边缘似然里的积分通常难算，需要引入近似后验。</td><td>ELBO：重建项减去 KL 正则项。</td></tr>
+                <tr><td>GAN</td><td>隐式生成分布 \(p_g\)</td><td>\(p_g(x)\) 往往没有显式密度，难以写 likelihood。</td><td>训练判别器估计分布差异，再把信号传给生成器。</td></tr>
+                <tr><td>Diffusion / Score</td><td>一族加噪分布 \(p_t(x)\) 与反向去噪路径</td><td>直接从噪声到数据太难，于是拆成很多小步。</td><td>预测噪声、score 或 denoising target。</td></tr>
+                <tr><td>Flow Matching</td><td>从源分布到数据分布的概率路径</td><td>不直接建模密度，而是建模概率质量如何移动。</td><td>回归速度场 \(v_\theta(x,t)\)。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="insight-box">读任何生成模型论文时，都可以先问同一个问题：作者到底是在显式写密度、用下界近似密度、用判别器比较分布、用去噪估计方向，还是用速度场搬运概率质量？先把训练信号放回分布拟合目标里，论文就不会只剩一堆孤立公式。</div>
         </section>
 
         <section class="article-section">
@@ -3493,6 +3560,24 @@ window.siteContent = {
             </svg>
             <figcaption>自绘图：DDPM 训练和采样使用同一个网络，但信息条件不同。训练时从真实 \(x_0\) 随机选 \(t\) 并采样真实噪声 \(\epsilon\)，所以可以合成 \(x_t\) 并用 MSE 监督 \(\epsilon_\theta\)。采样时只有 \(x_t\)，网络预测噪声后构造反向均值，再采样 \(x_{t-1}\)，循环直到得到 \(x_0\)。</figcaption>
           </figure>
+
+          <p>如果你打开 DDPM 原论文的 Algorithm 1 和 Algorithm 2，可以把每一行翻译成下面这张表。重点不是背伪代码，而是看清楚：哪些量训练时可见，哪些量采样时必须由网络估计。</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>论文算法行</th><th>本文符号</th><th>应该理解成什么</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>sample \(x_0\sim q(x_0)\)</td><td>训练数据 \(x_0\)</td><td>真实样本只在训练时可见，采样时没有 \(x_0\)。</td></tr>
+                <tr><td>sample \(t,\epsilon\)</td><td>\(t\sim U\{1,\ldots,T\}\)，\(\epsilon\sim\mathcal{N}(0,I)\)</td><td>随机选一个噪声等级，并记录真实噪声作为监督信号。</td></tr>
+                <tr><td>form \(x_t\)</td><td>\(x_t=\sqrt{\bar{\alpha}_t}x_0+\sqrt{1-\bar{\alpha}_t}\epsilon\)</td><td>训练时不用一步步加噪，而是用闭式公式直接合成任意时间步。</td></tr>
+                <tr><td>gradient step</td><td>\(\|\epsilon-\epsilon_\theta(x_t,t)\|^2\)</td><td>网络学的是“这次到底加了哪份噪声”，不是直接背训练图片。</td></tr>
+                <tr><td>sample \(x_T\sim\mathcal{N}(0,I)\)</td><td>采样起点 \(x_T\)</td><td>生成从纯噪声开始，不再访问训练样本。</td></tr>
+                <tr><td>for \(t=T,\ldots,1\)</td><td>反向链 \(x_t\to x_{t-1}\)</td><td>每一步都调用同一个噪声预测网络，逐级降低噪声。</td></tr>
+                <tr><td>sample \(x_{t-1}\)</td><td>\(\mu_\theta(x_t,t)\) 加噪声项</td><td>均值由网络预测噪声构造，方差由采样设定给出。</td></tr>
+              </tbody>
+            </table>
+          </div>
 
           <p>DDPM 的反向过程是随机的 Markov 链。DDIM 则构造了一个可以确定性采样的路径。它保持相同的边缘 \(q(x_t|x_0)\)，但不要求反向过程必须是原来的随机 Markov 链。当 \(\eta=0\) 时，DDIM 采样是确定性的；同一个初始噪声会得到一致的生成结果。这也解释了为什么 DDIM 可以用于 latent interpolation。</p>
           <p>DDIM 的一步更新常写成下面的形式。先由网络得到：</p>
