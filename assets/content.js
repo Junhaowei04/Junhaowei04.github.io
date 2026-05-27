@@ -2804,6 +2804,30 @@ window.siteContent = {
           <p>这里的 \(\delta\) 可以理解为“把概率质量放在每个训练样本上的尖峰”。经验分布只在训练样本处有质量，而真实分布应该更平滑、更广泛。训练生成模型时，我们不能只死记这个经验分布，而要用模型族 \(p_\theta(x)\) 学出一个能概括总体规律的分布。</p>
           <p>这也解释了泛化问题。训练集越小，经验分布越粗糙，模型越容易误判总体形状；训练集越大，样本平均越能代表真实分布，参数估计越可靠。但即使训练集很大，模型族如果选得太弱，也仍然学不好。例如用一个单峰正态分布去拟合多种动物图片，模型表达能力显然不够。</p>
           <div class="insight-box">训练集不是目标本身，而是通向真实分布的窗口。生成模型真正想学的是窗口背后的世界。</div>
+
+          <h3>三个分布不要混淆</h3>
+          <p>初学者读生成模型论文时，最容易把 \(p_{\mathrm{data}}\)、\(\hat{p}_{\mathrm{data}}\) 和 \(p_\theta\) 混成一个东西。它们确实有关，但角色完全不同。</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>对象</th><th>它是什么</th><th>我们是否知道解析式</th><th>训练中扮演的角色</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>真实分布 \(p_{\mathrm{data}}(x)\)</td><td>真实世界生成数据的未知机制</td><td>通常不知道</td><td>真正想逼近的目标。</td></tr>
+                <tr><td>经验分布 \(\hat{p}_{\mathrm{data}}(x)\)</td><td>把有限训练样本看成一堆概率尖峰</td><td>知道，因为训练集在手里</td><td>提供对真实分布期望的样本近似。</td></tr>
+                <tr><td>模型分布 \(p_\theta(x)\)</td><td>由我们选择的模型族和参数定义</td><td>取决于模型，有些可算，有些只可采样</td><td>训练后希望能接近真实分布，并从中生成新样本。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>最大似然训练时，代码里看到的是训练样本，所以最直接接触的是 \(\hat{p}_{\mathrm{data}}\)。但目标不是让模型变成一堆训练样本尖峰，而是借助样本平均去逼近真实分布下的期望：</p>
+          <div class="equation">\[
+            \mathbb{E}_{p_{\mathrm{data}}}[\log p_\theta(x)]
+            \approx
+            \mathbb{E}_{\hat{p}_{\mathrm{data}}}[\log p_\theta(x)]
+            =
+            \frac{1}{N}\sum_{i=1}^{N}\log p_\theta(x^{(i)}).
+          \]</div>
+          <p>这句话非常关键：训练集是计算目标的入口，不是生成模型最终要复制的对象。后面看 VAE、GAN、Diffusion 时，也可以一直带着这个三分法：真实分布是目标，经验分布给样本，模型分布负责学习和生成。</p>
         </section>
 
         <section class="article-section">
@@ -3276,6 +3300,11 @@ window.siteContent = {
           </ol>
           <p>这三个问题能把大多数生成模型串起来。</p>
 
+          <figure class="source-figure">
+            <img src="https://lilianweng.github.io/posts/2021-07-11-diffusion-models/generative-overview.png" alt="overview of GAN VAE flow-based model and diffusion model" loading="lazy" />
+            <figcaption>参考图：GAN、VAE、Flow-based model 和 Diffusion model 的结构对比。读这类图时不要只看网络形状，而要问：它怎样表示分布、怎样训练、怎样采样。图片来源：Lilian Weng, What are Diffusion Models?</figcaption>
+          </figure>
+
           <figure class="visual-figure">
             <svg viewBox="0 0 980 470" role="img" aria-label="几类生成模型如何表达分布、训练和采样的路线图">
               <defs>
@@ -3440,6 +3469,7 @@ window.siteContent = {
 
           <h3>第一轮：定义有没有真正落地？</h3>
           <p><strong>问题一：为什么不能直接说“生成模型就是学习训练集”？</strong>因为训练集只是有限样本。一个模型如果只记住训练集，它最多能复读旧样本，不能理解总体规律。生成模型真正想学的是训练集背后的数据分布。对于身高数据，训练集中可能没有 173.9 厘米这个值，但如果总体分布支持这个身高，模型就应该能生成它。对于图片也是一样，模型生成的新图片不应该只是训练图像的复制品，而应该是符合真实图片分布的新样本。卡住时回到第 1 节和第 4.5 节。</p>
+          <p><strong>问题一（补充）：你能否区分真实分布、经验分布和模型分布？</strong>\(p_{\mathrm{data}}\) 是真实但未知的数据机制，\(\hat{p}_{\mathrm{data}}\) 是有限训练集形成的样本近似，\(p_\theta\) 是我们训练出来用于采样和评价的模型分布。卡住时回到第 4.5 节的“三个分布不要混淆”。</p>
           <p><strong>问题二：为什么一定要引入概率分布？不能只训练一个函数吗？</strong>如果只训练一个确定性函数，输入相同就输出相同，很难描述“可能性”。生成问题天然带有不确定性：同一句提示词可以对应许多合理图片，同一个类别可以对应许多不同样本。概率分布提供了一种语言，告诉我们哪些样本更可能出现，哪些样本不太可能出现。没有分布，就很难严格讨论“像真实数据”这件事。卡住时回到第 2 节和第 4 节。</p>
           <p><strong>问题三：什么叫“从模型里采样”？</strong>采样不是让模型复制某个训练样本，而是按照模型分布的概率规律随机产生一个新样本。身高模型里，采样就是从正态分布抽一个身高；图像生成里，采样就是从学到的高维图像分布里抽一个图像。卡住时回到第 8 节。</p>
 
@@ -3471,6 +3501,7 @@ window.siteContent = {
             <li><a href="https://arxiv.org/abs/2006.11239" target="_blank" rel="noreferrer">Ho, Jain, Abbeel, Denoising Diffusion Probabilistic Models, 2020</a></li>
             <li><a href="https://arxiv.org/abs/2011.13456" target="_blank" rel="noreferrer">Song et al., Score-Based Generative Modeling through Stochastic Differential Equations, 2020</a></li>
             <li><a href="https://arxiv.org/abs/2210.02747" target="_blank" rel="noreferrer">Lipman et al., Flow Matching for Generative Modeling, 2022</a></li>
+            <li><a href="https://lilianweng.github.io/posts/2021-07-11-diffusion-models/" target="_blank" rel="noreferrer">Lilian Weng, What are Diffusion Models?</a></li>
             <li><a href="https://lilianweng.github.io/posts/2018-10-13-flow-models/" target="_blank" rel="noreferrer">Lilian Weng, Flow-based Deep Generative Models</a></li>
             <li><a href="https://commons.wikimedia.org/wiki/File:Three-generative-models.png" target="_blank" rel="noreferrer">Wikimedia Commons, Three-generative-models.png</a></li>
           </ul>
