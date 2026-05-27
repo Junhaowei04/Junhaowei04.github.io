@@ -4416,6 +4416,11 @@ window.siteContent = {
           </ol>
           <p>DDPM 原论文的 Algorithm 1 和 Algorithm 2 可以理解成同一套对象在两个阶段的不同用法。训练时我们人为合成 \(x_t\)，所以知道加入的真实噪声 \(\epsilon\)；采样时我们已经没有 \(x_0\) 和 \(\epsilon\)，只能让网络给出方向，再一步步从 \(x_T\) 走回 \(x_0\)。</p>
 
+          <figure class="source-figure">
+            <img src="https://lilianweng.github.io/posts/2021-07-11-diffusion-models/DDPM-algo.png" alt="DDPM training and sampling algorithms" loading="lazy" />
+            <figcaption>参考图：DDPM 的训练算法和采样算法。训练时随机抽 \(x_0,t,\epsilon\) 构造 \(x_t\)，用真实噪声监督 \(\epsilon_\theta\)；采样时从 \(x_T\sim\mathcal{N}(0,I)\) 开始反复调用模型得到 \(x_{t-1}\)。图片来源：Lilian Weng, What are Diffusion Models?；算法来自 Ho, Jain, Abbeel 的 DDPM 论文。</figcaption>
+          </figure>
+
           <figure class="visual-figure">
             <svg viewBox="0 0 980 520" role="img" aria-label="DDPM 训练算法和采样算法的对照流程图">
               <defs>
@@ -4499,6 +4504,37 @@ window.siteContent = {
               </tbody>
             </table>
           </div>
+
+          <h3>10.1 DDPM 原论文到底贡献了什么？</h3>
+          <p>如果只看今天的 Stable Diffusion 或各种采样器，DDPM 可能会被误解成“训练 U-Net 预测噪声”。但 Ho、Jain 和 Abbeel 的原论文真正做的事情，是把早期 diffusion probabilistic model 变成了一套可训练、可采样、效果很强的图像生成框架。它至少有四个核心贡献。</p>
+          <p><strong>第一，把生成过程写成清楚的概率模型。</strong>前向链 \(q(x_{1:T}|x_0)\) 是固定的高斯加噪过程，反向链 \(p_\theta(x_{0:T})\) 是要学习的生成过程。这样 diffusion 不是一个模糊的“逐步去噪想法”，而是一个含有隐变量链的概率模型：</p>
+          <div class="equation">\[
+            p_\theta(x_{0:T})
+            =
+            p(x_T)
+            \prod_{t=1}^{T}
+            p_\theta(x_{t-1}|x_t).
+          \]</div>
+          <p><strong>第二，把最大似然训练变成可分解的变分目标。</strong>直接算 \(\log p_\theta(x_0)\) 要把整条 \(x_{1:T}\) 积分掉，很难；DDPM 引入已知的前向过程作为变分分布，得到 VLB/ELBO，并把它拆成 \(L_T,L_{t-1},L_0\)。这一步让每个时间步的训练目标都有明确概率意义：模型反向高斯要靠近真实后验高斯。</p>
+          <p><strong>第三，用噪声预测参数化反向均值。</strong>原论文最有影响力的工程和理论连接之一，是把反向均值的学习改写成预测 \(\epsilon\)。因为训练时 \(x_t\) 是由 \(x_0\) 和真实噪声 \(\epsilon\) 合成的，所以这个监督信号天然可得：</p>
+          <div class="equation">\[
+            x_t
+            =
+            \sqrt{\bar{\alpha}_t}x_0
+            +
+            \sqrt{1-\bar{\alpha}_t}\epsilon,
+            \qquad
+            \epsilon\sim\mathcal{N}(0,I).
+          \]</div>
+          <p>于是复杂的逐步 KL 匹配，最后可以落到一个很简单的训练式子：</p>
+          <div class="equation">\[
+            \mathbb{E}_{x_0,t,\epsilon}
+            \left[
+              \|\epsilon-\epsilon_\theta(x_t,t)\|^2
+            \right].
+          \]</div>
+          <p><strong>第四，证明这条路线能真正生成高质量样本。</strong>原论文的意义不只是“有一个漂亮推导”，还在于它展示了简化噪声预测目标在图像生成上非常有效，并把 diffusion 与 denoising score matching、Langevin dynamics 的联系显式说出来。这使得后来的 DDIM、Improved DDPM、score-based SDE、EDM、latent diffusion 和 flow matching 都能沿着同一条主线继续发展。</p>
+          <div class="paper-note">读 DDPM 原文时，建议把它看成五句话：固定前向加噪链；学习反向去噪链；用 ELBO 解释训练；用噪声预测简化目标；从纯高斯反复采样回数据。只要这五句话能和公式互相翻译，原论文的主干就已经抓住了。</div>
 
           <p>DDPM 的反向过程是随机的 Markov 链。DDIM 则构造了一个可以确定性采样的路径。它保持相同的边缘 \(q(x_t|x_0)\)，但不要求反向过程必须是原来的随机 Markov 链。当 \(\eta=0\) 时，DDIM 采样是确定性的；同一个初始噪声会得到一致的生成结果。这也解释了为什么 DDIM 可以用于 latent interpolation。</p>
           <p>DDIM 的一步更新常写成下面的形式。先由网络得到：</p>
@@ -5108,6 +5144,7 @@ window.siteContent = {
           <p><strong>检查四：你能否解释为什么 \(q(x_{t-1}|x_t,x_0)\) 是高斯？</strong>回答时应该说出贝叶斯公式、Markov 性、两个高斯密度相乘、二次型配方、精度相加。这里是读 DDPM 论文最关键的门槛。卡住时回到第 6 节。</p>
           <p><strong>检查五：你能否解释为什么预测噪声可以训练生成模型？</strong>回答时不能只说“DDPM 就是这么做的”，而要说清楚：预测噪声可以反推出 \(\hat{x}_0\)，进而参数化反向均值；反向高斯 KL 在方差固定时变成均值 MSE；均值 MSE 又可以写成噪声 MSE。卡住时回到第 7 节和第 9 节。</p>
           <p><strong>检查五（补充）：你能否把 DDPM 原论文 Algorithm 1 和 Algorithm 2 讲成代码流程？</strong>训练算法要说清楚 \(x_0,t,\epsilon,x_t\) 从哪里来，以及为什么有真实 \(\epsilon\) 可以监督；采样算法要说清楚为什么从 \(x_T\sim\mathcal{N}(0,I)\) 开始，怎样反复调用 \(\epsilon_\theta(x_t,t)\) 得到 \(x_{t-1}\)。卡住时回到第 7.5 节和第 10 节。</p>
+          <p><strong>检查五（再补充）：你能否用五句话复述 DDPM 原论文的主干贡献？</strong>应该能说出：固定前向加噪链；学习反向去噪链；用 ELBO/VLB 解释训练；用噪声预测简化目标；从纯高斯开始按 Algorithm 2 逐步采样。卡住时回到第 10.1 节。</p>
           <p><strong>检查六：你能否把 score 和噪声预测联系起来？</strong>应该能写出：</p>
           <div class="equation">\[
             \nabla_{x_t}\log q(x_t|x_0)
@@ -5129,6 +5166,7 @@ window.siteContent = {
         <section class="article-section references">
           <h2>参考资料</h2>
           <ul>
+            <li><a href="https://arxiv.org/abs/1503.03585" target="_blank" rel="noreferrer">Sohl-Dickstein et al., Deep Unsupervised Learning using Nonequilibrium Thermodynamics, 2015</a></li>
             <li><a href="https://arxiv.org/abs/2006.11239" target="_blank" rel="noreferrer">Ho, Jain, Abbeel, Denoising Diffusion Probabilistic Models, 2020</a></li>
             <li><a href="https://arxiv.org/abs/2010.02502" target="_blank" rel="noreferrer">Song, Meng, Ermon, Denoising Diffusion Implicit Models, 2020</a></li>
             <li><a href="https://arxiv.org/abs/2011.13456" target="_blank" rel="noreferrer">Song et al., Score-Based Generative Modeling through Stochastic Differential Equations, 2021</a></li>
